@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Rarry Editor</title>
     <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="https://unpkg.com/@blockly/continuous-toolbox@7.0.1/dist/index.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/5.3.3/pixi.min.js"></script>
     <link href="styles.css" rel="stylesheet" />
 
@@ -187,91 +188,90 @@
         </category>
 
         <category name="Operators" colour="#59ba57">
-            <category name="Logic" colour="#59ba57">
-                <block type="logic_compare"></block>
-                <block type="logic_operation"></block>
-                <block type="logic_negate"></block>
-                <block type="logic_boolean"></block>
-                <block type="logic_null"></block>
-                <block type="logic_ternary">
-                </block>
-            </category>
+            <label text="Logic"></label>
 
-            <category name="Math" colour="#59ba57">
-                <block type="math_number">
-                    <field name="NUM">0</field>
-                </block>
-                <block type="math_arithmetic"></block>
-                <block type="math_single"></block>
-                <block type="math_trig"></block>
-                <block type="math_constant"></block>
-                <block type="math_number_property"></block>
-                <block type="math_round"></block>
-                <block type="math_on_list"></block>
-                <block type="math_modulo"></block>
-                <block type="math_constrain">
-                    <value name="LOW">
-                        <shadow type="math_number">
-                            <field name="NUM">1</field>
-                        </shadow>
-                    </value>
-                    <value name="HIGH">
-                        <shadow type="math_number">
-                            <field name="NUM">100</field>
-                        </shadow>
-                    </value>
-                </block>
-                <block type="math_random_int">
-                    <value name="FROM">
-                        <shadow type="math_number">
-                            <field name="NUM">1</field>
-                        </shadow>
-                    </value>
-                    <value name="TO">
-                        <shadow type="math_number">
-                            <field name="NUM">100</field>
-                        </shadow>
-                    </value>
-                </block>
-                <block type="math_random_float"></block>
-            </category>
+            <block type="logic_compare"></block>
+            <block type="logic_operation"></block>
+            <block type="logic_negate"></block>
+            <block type="logic_boolean"></block>
+            <block type="logic_null"></block>
+            <block type="logic_ternary"></block>
 
-            <category name="Text" colour="#59ba57">
-                <block type="text"></block>
-                <block type="text_join"></block>
-                <block type="text_append">
-                    <value name="TEXT">
-                        <shadow type="text"></shadow>
-                    </value>
-                </block>
-                <block type="text_length"></block>
-                <block type="text_isEmpty"></block>
-                <block type="text_indexOf">
-                    <value name="VALUE">
-                        <block type="variables_get">
-                            <field name="VAR">text</field>
-                        </block>
-                    </value>
-                </block>
-                <block type="text_charAt">
-                    <value name="VALUE">
-                        <block type="variables_get">
-                            <field name="VAR">text</field>
-                        </block>
-                    </value>
-                </block>
-                <block type="text_getSubstring">
-                    <value name="STRING">
-                        <block type="variables_get">
-                            <field name="VAR">text</field>
-                        </block>
-                    </value>
-                </block>
-                <block type="text_changeCase"></block>
-                <block type="text_trim"></block>
-                <block type="text_print"></block>
-                <block type="text_prompt_ext"></block>
-            </category>
+            <label text="Math"></label>
+            
+            <block type="math_number">
+                <field name="NUM">0</field>
+            </block>
+            <block type="math_arithmetic"></block>
+            <block type="math_single"></block>
+            <block type="math_trig"></block>
+            <block type="math_constant"></block>
+            <block type="math_number_property"></block>
+            <block type="math_round"></block>
+            <block type="math_on_list"></block>
+            <block type="math_modulo"></block>
+            <block type="math_constrain">
+                <value name="LOW">
+                    <shadow type="math_number">
+                        <field name="NUM">1</field>
+                    </shadow>
+                </value>
+                <value name="HIGH">
+                    <shadow type="math_number">
+                        <field name="NUM">100</field>
+                    </shadow>
+                </value>
+            </block>
+            <block type="math_random_int">
+                <value name="FROM">
+                    <shadow type="math_number">
+                        <field name="NUM">1</field>
+                    </shadow>
+                </value>
+                <value name="TO">
+                    <shadow type="math_number">
+                        <field name="NUM">100</field>
+                    </shadow>
+                </value>
+            </block>
+            <block type="math_random_float"></block>
+
+            <label text="Text"></label>
+
+            <block type="text"></block>
+            <block type="text_join"></block>
+            <block type="text_append">
+                <value name="TEXT">
+                    <shadow type="text"></shadow>
+                </value>
+            </block>
+            <block type="text_length"></block>
+            <block type="text_isEmpty"></block>
+            <block type="text_indexOf">
+                <value name="VALUE">
+                    <block type="variables_get">
+                        <field name="VAR">text</field>
+                    </block>
+                </value>
+            </block>
+            <block type="text_charAt">
+                <value name="VALUE">
+                    <block type="variables_get">
+                        <field name="VAR">text</field>
+                    </block>
+                </value>
+            </block>
+            <block type="text_getSubstring" collapsed="true">
+                <value name="STRING">
+                    <block type="variables_get">
+                        <field name="VAR">text</field>
+                    </block>
+                </value>
+            </block>
+            <block type="text_changeCase"></block>
+            <block type="text_trim"></block>
+            <block type="text_print"></block>
+            <block type="text_prompt_ext"></block>
         </category>
 
         <category name="System" colour="#5CB1D6">
@@ -344,6 +344,7 @@
 
     <script src="blocks.js"></script>
     <script src="script.js"></script>
+    <script src="patches.js"></script>
 </body>
 
 </html>

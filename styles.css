@@ -307,6 +307,23 @@ button {
     filter: invert(1);
 }
 
+.blocklyToolboxCategory {
+    transition: background-color 0.2s ease;
+}
+
+.blocklyTreeRowContentContainer {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 3px;
+}
+
+.categoryBubble {
+    margin: 0;
+    padding: 0;
+}
+
 ::-webkit-scrollbar {
     width: 8px;
 }

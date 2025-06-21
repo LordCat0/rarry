@@ -81,7 +81,7 @@ const lightTheme = Blockly.Theme.defineTheme("customLightTheme", {
   blockStyles: blockStyles,
 });
 
-const darkTheme = Blockly.Theme.defineTheme("customLightTheme", {
+const darkTheme = Blockly.Theme.defineTheme("customDarkTheme", {
   base: Blockly.Themes.Classic,
   blockStyles: blockStyles,
   componentStyles: {
@@ -99,7 +99,7 @@ const darkTheme = Blockly.Theme.defineTheme("customLightTheme", {
   },
 });
 
-Blockly.VerticalFlyout.prototype.getFlyoutScale = () => 0.9;
+registerContinuousToolbox();
 
 const toolbox = document.getElementById("toolbox");
 const workspace = Blockly.inject("blocklyDiv", {
@@ -109,13 +109,25 @@ const workspace = Blockly.inject("blocklyDiv", {
   renderer: "zelos",
   theme: savedTheme === "dark" ? darkTheme : lightTheme,
   zoom: {
-    controls: true, 
-    wheel: true, 
+    controls: true,
+    wheel: true,
     startScale: 0.9,
-    maxScale: 3, 
-    minScale: 0.3, 
-    scaleSpeed: 1.2, 
+    maxScale: 3,
+    minScale: 0.3,
+    scaleSpeed: 1.2,
   },
+  plugins: {
+    flyoutsVerticalToolbox: "ContinuousFlyout",
+    metricsManager: "ContinuousMetrics",
+    toolbox: "ContinuousToolbox",
+  },
+});
+
+workspace.getParentSvg().addEventListener("click", () => {
+  const toolbox = workspace.getToolbox();
+  if (toolbox && toolbox.getFlyout()) {
+    toolbox.getFlyout().hide();
+  }
 });
 
 toggleBtn.addEventListener("click", () => {
