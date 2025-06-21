@@ -187,6 +187,27 @@ Blockly.Blocks["get_mouse_position"] = {
   },
 };
 
+Blockly.Blocks["mouse_button_pressed"] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField("is")
+      .appendField(
+        new Blockly.FieldDropdown([
+          ["left", "0"],
+          ["middle", "1"],
+          ["right", "2"],
+          ["back", "3"],
+          ["forward", "4"],
+          ["any", "any"],
+        ]),
+        "BUTTON"
+      )
+      .appendField("mouse button down?");
+    this.setOutput(true, "Boolean");
+    this.setColour("#5CB1D6");
+  },
+};
+
 Blockly.JavaScript.forBlock["when_flag_clicked"] = function (block) {
   const branch = Blockly.JavaScript.statementToCode(block, "DO");
   return `whenFlagClicked(async () => {\n${branch}});\n`;
@@ -295,4 +316,13 @@ Blockly.JavaScript.forBlock["key_pressed"] = function (block, generator) {
 Blockly.JavaScript.forBlock["get_mouse_position"] = function (block) {
   const menu = block.getFieldValue("MENU");
   return [`getMousePosition("${menu}")`, Blockly.JavaScript.ORDER_NONE];
+};
+
+Blockly.JavaScript.forBlock["mouse_button_pressed"] = function (
+  block,
+  generator
+) {
+  const button = block.getFieldValue("BUTTON");
+  const safeButton = generator.quote_(button);
+  return [`isMouseButtonPressed(${safeButton})`, Blockly.JavaScript.ORDER_NONE];
 };

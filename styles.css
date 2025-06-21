@@ -311,6 +311,10 @@ button {
     transition: background-color 0.2s ease;
 }
 
+.blocklyToolboxCategoryLabel {
+    transition: color 0.2s ease;
+}
+
 .blocklyTreeRowContentContainer {
     display: flex;
     flex-direction: row;

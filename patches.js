@@ -1,4 +1,4 @@
-Blockly.VerticalFlyout.prototype.getFlyoutScale = () => 0.9;
+Blockly.VerticalFlyout.prototype.getFlyoutScale = () => 0.8;
 
 [
   "controls_if",
@@ -23,10 +23,7 @@ Blockly.Blocks["controls_forEach"].init = (function (original) {
 
 Blockly.Blocks["text"] = {
   init: function () {
-    this.appendDummyInput().appendField(
-      new Blockly.FieldTextInput(""),
-      "TEXT"
-    );
+    this.appendDummyInput().appendField(new Blockly.FieldTextInput(""), "TEXT");
     this.setOutput(true, "String");
     this.setStyle("text_blocks");
     this.setTooltip(Blockly.Msg["TEXT_TEXT_TOOLTIP"]);
@@ -39,7 +36,7 @@ Blockly.Blocks["text"] = {
       }
     }, 0);
   },
-};  
+};
 
 Blockly.JavaScript.forBlock["procedures_defnoreturn"] = function (
   block,
@@ -213,3 +210,44 @@ Blockly.JavaScript.forBlock["procedures_callnoreturn"] = function (
   const code = generator.forBlock.procedures_callreturn(block, generator)[0];
   return code + ";\n";
 };
+
+const MAX_FLYOUT_WIDTH = 340;
+
+class CustomContinuousMetrics extends ContinuousMetrics {
+  getFlyoutMetrics(visible = false) {
+    this.flyoutMetrics_ = null;
+    const m = super.getFlyoutMetrics(visible);
+    m.width = Math.min(m.width, MAX_FLYOUT_WIDTH);
+    return m;
+  }
+
+  getToolboxMetrics() {
+    this.toolboxMetrics_ = null;
+    const m = super.getToolboxMetrics();
+    m.width = Math.min(m.width, MAX_FLYOUT_WIDTH);
+    return m;
+  }
+}
+
+class CustomContinuousFlyout extends ContinuousFlyout {
+  position() {
+    super.position();
+    if (this.width_ > MAX_FLYOUT_WIDTH) {
+      this.width_ = MAX_FLYOUT_WIDTH;
+      this.svgGroup_.setAttribute("width", String(MAX_FLYOUT_WIDTH));
+    }
+  }
+
+  show(contents, gaps) {
+    super.show(contents, gaps);
+
+    this.workspace_.resizeContents();
+    this.workspace_.resize();
+    this.workspace_.scrollbar.resize();
+    Blockly.svgResize(this.workspace_);
+
+    if (this.workspace_.metricsManager.resize) {
+      this.workspace_.metricsManager.resize();
+    }
+  }
+}

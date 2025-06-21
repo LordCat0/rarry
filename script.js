@@ -117,8 +117,8 @@ const workspace = Blockly.inject("blocklyDiv", {
     scaleSpeed: 1.2,
   },
   plugins: {
-    flyoutsVerticalToolbox: "ContinuousFlyout",
-    metricsManager: "ContinuousMetrics",
+    flyoutsVerticalToolbox: CustomContinuousFlyout,
+    metricsManager: CustomContinuousMetrics,
     toolbox: "ContinuousToolbox",
   },
 });
@@ -297,6 +297,7 @@ function calculateBubblePosition(
 }
 
 const keysPressed = {};
+const mouseButtonsPressed = {};
 
 let runningScripts = [],
   shouldStop = false,
@@ -341,37 +342,37 @@ function runCode() {
     tempWorkspace.dispose();
 
     try {
-      const whenFlagClicked = (callback) => {
+      function whenFlagClicked(callback) {
         flagEvents.push(callback);
-      };
+      }
 
-      const moveSteps = (steps) => {
+      function moveSteps(steps) {
         const sprite = spriteData.pixiSprite;
         const angle = sprite.rotation;
         sprite.x += Math.cos(angle) * Number(steps);
         sprite.y -= Math.sin(angle) * Number(steps);
-      };
+      }
 
-      const changePosition = (menu, amount) => {
+      function changePosition(menu, amount) {
         const sprite = spriteData.pixiSprite;
         if (menu === "x") sprite.x += Number(amount);
         else if (menu === "y") sprite.y -= Number(amount);
-      };
+      }
 
-      const setPosition = (menu, amount) => {
+      function setPosition(menu, amount) {
         const sprite = spriteData.pixiSprite;
         if (menu === "x") sprite.x = Number(amount);
         else if (menu === "y") sprite.y = -Number(amount);
-      };
+      }
 
-      const getPosition = (menu) => {
+      function getPosition(menu) {
         const sprite = spriteData.pixiSprite;
         if (menu === "x") return sprite.x;
         else if (menu === "y") return -sprite.y;
         else if (menu === "angle") return sprite.rotation;
-      };
+      }
 
-      const getMousePosition = (menu) => {
+      function getMousePosition(menu) {
         const mouse = app.renderer.plugins.interaction.mouse.global;
         if (menu === "x")
           return Math.round(
@@ -381,9 +382,9 @@ function runCode() {
           return -Math.round(
             (mouse.y - app.renderer.height / 2) / app.stage.scale.y
           );
-      };
+      }
 
-      const sayMessage = (message, seconds) => {
+      function sayMessage(message, seconds) {
         if (shouldStop) return;
         if (spriteData.currentBubble) {
           app.stage.removeChild(spriteData.currentBubble);
@@ -453,13 +454,13 @@ function runCode() {
           }
           spriteData.sayTimeout = null;
         }, seconds * 1000);
-      };
+      }
 
-      const waitOneFrame = () => {
+      function waitOneFrame() {
         return new Promise((r) => setTimeout(r, 0));
-      };
+      }
 
-      const wait = (amount) => {
+      function wait(amount) {
         return new Promise((resolve, reject) => {
           if (shouldStop) return reject(new Error("shouldStop"));
 
@@ -470,20 +471,28 @@ function runCode() {
 
           runningScripts.push(timeout);
         });
-      };
+      }
 
-      const switchCostume = (name) => {
+      function switchCostume(name) {
         const found = spriteData.costumes.find((c) => c.name === name);
         if (found) {
           spriteData.pixiSprite.texture = found.texture;
         }
-      };
+      }
 
-      const projectTime = () => {
+      function projectTime() {
         return (Date.now() - projectStartedTime) / 1000;
-      };
+      }
 
       const isKeyPressed = (key) => !!keysPressed[key];
+      const isMouseButtonPressed = (button) => {
+        if (button === "any") {
+          return Object.values(mouseButtonsPressed).some((pressed) => pressed);
+        }
+
+        return !!mouseButtonsPressed[Number(button)];
+      };
+      
 
       eval(code);
     } catch (e) {
@@ -660,9 +669,15 @@ window.addEventListener("resize", () => {
 window.addEventListener("keydown", (e) => {
   keysPressed[e.key] = true;
 });
-
 window.addEventListener("keyup", (e) => {
   keysPressed[e.key] = false;
+});
+
+window.addEventListener("mousedown", (e) => {
+  mouseButtonsPressed[e.button] = true;
+});
+window.addEventListener("mouseup", (e) => {
+  mouseButtonsPressed[e.button] = false;
 });
 
 app.ticker.add(() => {
