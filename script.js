@@ -20,6 +20,7 @@ const app = new PIXI.Application({
   height: BASE_HEIGHT,
   backgroundColor: 0xffffff,
 });
+app.stop();
 app.stageWidth = BASE_WIDTH;
 app.stageHeight = BASE_HEIGHT;
 
@@ -144,12 +145,9 @@ let activeSprite = null,
   lastSpriteAngle = null;
 
 function addSprite() {
-  const texture = PIXI.Texture.from(
-    "https://s3-us-west-2.amazonaws.com/s.cdpn.io/106114/cat.png",
-    {
-      crossorigin: true,
-    }
-  );
+  const texture = PIXI.Texture.from("./icons/ddededodediamante.png", {
+    crossorigin: true
+  });
   const sprite = new PIXI.Sprite(texture);
   sprite.anchor.set(0.5);
   sprite.x = 0;
@@ -219,17 +217,18 @@ function renderSpritesList() {
     if (activeSprite && activeSprite.id === spriteData.id)
       spriteIconContainer.className = "active";
 
-    const img = new Image(60, 60);
+    const img = new Image(50, 50);
     img.style.objectFit = "contain";
-
-    const costumeTexture = spriteData.costumes[0].texture;
+    const costumeTexture = spriteData.pixiSprite.texture;
     const baseTex = costumeTexture.baseTexture;
 
     if (baseTex.valid) {
       img.src = baseTex.resource?.url || "";
+      app.render();
     } else {
       baseTex.on("loaded", () => {
         img.src = baseTex.resource?.url || "";
+        app.render();
       });
     }
 
@@ -258,7 +257,7 @@ function renderSpriteInfo() {
 function renderCostumesList() {
   costumesList.innerHTML = "";
 
-  activeSprite.costumes.forEach((costume) => {
+  activeSprite.costumes.forEach((costume, index) => {
     const costumeContainer = document.createElement("div");
     costumeContainer.className = "costume-container";
 
@@ -269,8 +268,23 @@ function renderCostumesList() {
     const nameLabel = document.createElement("p");
     nameLabel.textContent = costume.name;
 
+    const deleteBtn = document.createElement("button");
+    deleteBtn.textContent = "Delete";
+    deleteBtn.className = "danger";
+    deleteBtn.onclick = () => {
+      activeSprite.costumes.splice(index, 1);
+      if (activeSprite.costumes.length > 0) {
+        activeSprite.pixiSprite.texture = activeSprite.costumes[0].texture;
+      } else {
+        const emptyTexture = PIXI.Texture.EMPTY;
+        activeSprite.pixiSprite.texture = emptyTexture;
+      }
+      renderCostumesList();
+    };
+
     costumeContainer.appendChild(img);
     costumeContainer.appendChild(nameLabel);
+    costumeContainer.appendChild(deleteBtn);
     costumesList.appendChild(costumeContainer);
   });
 }
@@ -304,6 +318,8 @@ let runningScripts = [],
   projectStartedTime = Date.now();
 
 function stopAllScripts() {
+  app.stop();
+
   shouldStop = true;
 
   runningScripts.forEach(clearTimeout);
@@ -322,6 +338,8 @@ function stopAllScripts() {
 }
 
 function runCode() {
+  app.start();
+
   stopAllScripts();
   shouldStop = false;
   projectStartedTime = Date.now();
@@ -485,14 +503,13 @@ function runCode() {
       }
 
       const isKeyPressed = (key) => !!keysPressed[key];
-      const isMouseButtonPressed = (button) => {
+      function isMouseButtonPressed(button) {
         if (button === "any") {
           return Object.values(mouseButtonsPressed).some((pressed) => pressed);
         }
 
         return !!mouseButtonsPressed[Number(button)];
-      };
-      
+      }
 
       eval(code);
     } catch (e) {
@@ -591,7 +608,7 @@ function saveProject() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "project.json";
+  a.download = "project.rarry";
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -599,9 +616,18 @@ function saveProject() {
 function loadProject(e) {
   const file = e.target.files[0];
   if (!file) return;
+
   const reader = new FileReader();
   reader.onload = () => {
-    const data = JSON.parse(reader.result);
+    let data;
+
+    try {
+      data = JSON.parse(reader.result);
+    } catch (error) {
+      window.alert("Invalid file provided");
+      return;
+    }
+
     sprites.forEach((s) => app.stage.removeChild(s.pixiSprite));
     sprites = [];
     data.forEach((entry) => {
@@ -630,6 +656,7 @@ function loadProject(e) {
       sprites.push(spriteData);
     });
     setActiveSprite(sprites[0] || null);
+    app.render();
   };
   reader.readAsText(file);
 }
@@ -648,10 +675,20 @@ document.getElementById("costume-upload").addEventListener("change", (e) => {
   const reader = new FileReader();
   reader.onload = () => {
     const texture = PIXI.Texture.from(reader.result);
-    const costumeName = file.name.split(".")[0];
-    activeSprite.costumes.push({ name: costumeName, texture });
 
-    activeSprite.pixiSprite.texture = texture;
+    let baseName = file.name.split(".")[0];
+    let uniqueName = baseName;
+    let counter = 1;
+
+    const nameExists = (name) =>
+      activeSprite.costumes.some((c) => c.name === name);
+
+    while (nameExists(uniqueName)) {
+      counter++;
+      uniqueName = `${baseName}_${counter}`;
+    }
+
+    activeSprite.costumes.push({ name: uniqueName, texture });
 
     if (document.getElementById("costumes-tab").classList.contains("active")) {
       tabButtons.forEach((button) => {
@@ -660,6 +697,7 @@ document.getElementById("costume-upload").addEventListener("change", (e) => {
     }
   };
   reader.readAsDataURL(file);
+  e.target.value = "";
 });
 
 window.addEventListener("resize", () => {
@@ -680,30 +718,19 @@ window.addEventListener("mouseup", (e) => {
   mouseButtonsPressed[e.button] = false;
 });
 
-app.ticker.add(() => {
-  if (!activeSprite) return;
-
-  const sprite = activeSprite.pixiSprite;
-  const x = sprite.x;
-  const y = sprite.y;
-  const angle = sprite.rotation;
-
-  if (x !== lastSpriteX || y !== lastSpriteY || angle !== lastSpriteAngle) {
-    lastSpriteX = x;
-    lastSpriteY = y;
-    lastSpriteAngle = angle;
-    renderSpriteInfo();
+SpriteChangeEvents.on("positionChanged", (sprite) => {
+  if (activeSprite.pixiSprite === sprite) renderSpriteInfo();
+  if (sprite.currentBubble) {
+    const pos = calculateBubblePosition(
+      sprite.pixiSprite,
+      sprite.currentBubble.width,
+      sprite.currentBubble.height
+    );
+    sprite.currentBubble.x = pos.x;
+    sprite.currentBubble.y = pos.y;
   }
+});
 
-  sprites.forEach((spriteData) => {
-    if (spriteData.currentBubble) {
-      const pos = calculateBubblePosition(
-        spriteData.pixiSprite,
-        spriteData.currentBubble.width,
-        spriteData.currentBubble.height
-      );
-      spriteData.currentBubble.x = pos.x;
-      spriteData.currentBubble.y = pos.y;
-    }
-  });
+SpriteChangeEvents.on("textureChanged", () => {
+  renderSpritesList();
 });

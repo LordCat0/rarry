@@ -2,7 +2,8 @@
 
 :root {
     --font: 'Inter', sans-serif;
-    --text-dark: #2b323b;
+    --dark: #2b323b;
+    --dark-light: #424c5a;
     --primary: #3b82f6;
     --primary-dark: #336ce7;
     --danger: #f63b3b;
@@ -14,7 +15,8 @@
 }
 
 .dark {
-    --text-dark: #e2e8f0;
+    --dark: #e2e8f0;
+    --dark-light: #c8cdd4;
     --primary: #3b82f6;
     --primary-dark: #336ce7;
     --danger: #f63b3b;
@@ -32,7 +34,7 @@
 }
 
 h1, h2, h3, input {
-    color: var(--text-dark);
+    color: var(--dark);
 }
 
 body {
@@ -83,26 +85,30 @@ button {
     padding: 0.5rem 1rem;
     border-radius: 0.5rem;
     border: none;
-    background-color: var(--text-dark);
+    background-color: var(--dark);
     color: var(--color1);
     cursor: pointer;
     transition: background-color 0.2s;
 }
 
-.save-button {
+button:hover {
+    background-color: var(--dark-light);
+}
+
+button.save-button {
     background-color: #f18f3f;
 }
 
-.save-button:hover {
+button.save-button:hover {
     background-color: #e28940;
 }
 
-.load-button {
+button.load-button {
     background-color: #2acc66;
     cursor: pointer;
 }
 
-.load-button:hover {
+button.load-button:hover {
     background-color: #28b85c;
 }
 
@@ -129,7 +135,7 @@ button {
     border-bottom: 2px solid var(--color3);
 }
 
-.tab-button {
+button.tab-button {
     flex: 1;
     padding: 0.5rem 0;
     text-align: center;
@@ -139,9 +145,9 @@ button {
     border-radius: 0;
 }
 
-.tab-button.inactive {
+button.tab-button.inactive {
     background-color: transparent;
-    color: var(--text-dark);
+    color: var(--dark);
 }
 
 .tab-content {
@@ -169,7 +175,7 @@ button {
     justify-content: flex-start;
     align-items: center;
     font-size: 1rem;
-    color: var(--text-dark);
+    color: var(--dark);
 }
 
 #stage-wrapper {
@@ -220,7 +226,12 @@ button {
 }
 
 #sprite-info p {
-    color: var(--text-dark);
+    color: var(--dark);
+}
+
+#sprite-info p:not(:last-child) {
+    padding-right: 5px;
+    border-right: 2px solid var(--color2);
 }
 
 #sprites-section {
@@ -281,11 +292,11 @@ button {
     background-color: var(--primary-dark);
 }
 
-#delete-sprite-button {
+#delete-sprite-button, button.danger {
     background-color: var(--danger);
 }
 
-#delete-sprite-button:hover {
+#delete-sprite-button:hover, button.danger:hover {
     background-color: var(--danger-dark);
 }
 

@@ -251,3 +251,45 @@ class CustomContinuousFlyout extends ContinuousFlyout {
     }
   }
 }
+
+const SpriteChangeEvents = new PIXI.utils.EventEmitter();
+
+const originalX = Object.getOwnPropertyDescriptor(PIXI.DisplayObject.prototype, 'x');
+const originalY = Object.getOwnPropertyDescriptor(PIXI.DisplayObject.prototype, 'y');
+const originalTexture = Object.getOwnPropertyDescriptor(PIXI.Sprite.prototype, 'texture');
+
+Object.defineProperty(PIXI.Sprite.prototype, 'x', {
+  get() {
+    return originalX.get.call(this);
+  },
+  set(value) {
+    if (this.x !== value) {
+      originalX.set.call(this, value);
+      SpriteChangeEvents.emit('positionChanged', this); 
+    }
+  }
+});
+
+Object.defineProperty(PIXI.Sprite.prototype, 'y', {
+  get() {
+    return originalY.get.call(this);
+  },
+  set(value) {
+    if (this.y !== value) {
+      originalY.set.call(this, value);
+      SpriteChangeEvents.emit('positionChanged', this); 
+    }
+  }
+});
+
+Object.defineProperty(PIXI.Sprite.prototype, 'texture', {
+  get() {
+    return originalTexture.get.call(this);
+  },
+  set(value) {
+    if (this.texture !== value) {
+      originalTexture.set.call(this, value);
+      SpriteChangeEvents.emit('textureChanged', this); 
+    }
+  }
+});

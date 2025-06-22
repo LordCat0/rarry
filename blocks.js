@@ -41,7 +41,7 @@ Blockly.Blocks["change_position"] = {
         ]),
         "MENU"
       )
-      .appendField("position by");
+      .appendField("by");
     this.setPreviousStatement(true, null);
     this.setNextStatement(true, null);
     this.setColour("#4C97FF");
