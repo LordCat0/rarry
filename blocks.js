@@ -144,6 +144,29 @@ Blockly.Blocks["switch_costume"] = {
   },
 };
 
+Blockly.Blocks["set_size"] = {
+  init: function () {
+    this.appendValueInput("AMOUNT")
+      .setCheck("Number")
+      .appendField("set size to");
+    this.appendDummyInput().appendField("%");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour("#9966FF");
+  },
+};
+
+Blockly.Blocks["change_size"] = {
+  init: function () {
+    this.appendValueInput("AMOUNT")
+      .setCheck("Number")
+      .appendField("change size by");
+    this.appendDummyInput().appendField("%");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.setColour("#9966FF");
+  },
+};
 const normalKeys = [
   ..."abcdefghijklmnopqrstuvwxyz",
   ..."0123456789",
@@ -305,6 +328,26 @@ Blockly.JavaScript.forBlock["switch_costume"] = function (block) {
       Blockly.JavaScript.ORDER_ATOMIC
     ) || '""';
   return `switchCostume(${costume});\n`;
+};
+
+Blockly.JavaScript.forBlock["set_size"] = function (block) {
+  const amount =
+    Blockly.JavaScript.valueToCode(
+      block,
+      "AMOUNT",
+      Blockly.JavaScript.ORDER_ATOMIC
+    ) || 100;
+  return `setSize(${amount}, false);\n`;
+};
+
+Blockly.JavaScript.forBlock["change_size"] = function (block) {
+  const amount =
+    Blockly.JavaScript.valueToCode(
+      block,
+      "AMOUNT",
+      Blockly.JavaScript.ORDER_ATOMIC
+    ) || 100;
+  return `setSize(${amount}, true);\n`;
 };
 
 Blockly.JavaScript.forBlock["key_pressed"] = function (block, generator) {

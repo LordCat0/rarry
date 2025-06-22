@@ -36,6 +36,8 @@ function resizeCanvas() {
 
   app.stage.x = w / 2;
   app.stage.y = h / 2;
+
+  app.render();
 }
 resizeCanvas();
 
@@ -100,8 +102,6 @@ const darkTheme = Blockly.Theme.defineTheme("customDarkTheme", {
   },
 });
 
-registerContinuousToolbox();
-
 const toolbox = document.getElementById("toolbox");
 const workspace = Blockly.inject("blocklyDiv", {
   toolbox: toolbox,
@@ -117,18 +117,6 @@ const workspace = Blockly.inject("blocklyDiv", {
     minScale: 0.3,
     scaleSpeed: 1.2,
   },
-  plugins: {
-    flyoutsVerticalToolbox: CustomContinuousFlyout,
-    metricsManager: CustomContinuousMetrics,
-    toolbox: "ContinuousToolbox",
-  },
-});
-
-workspace.getParentSvg().addEventListener("click", () => {
-  const toolbox = workspace.getToolbox();
-  if (toolbox && toolbox.getFlyout()) {
-    toolbox.getFlyout().hide();
-  }
 });
 
 toggleBtn.addEventListener("click", () => {
@@ -146,12 +134,13 @@ let activeSprite = null,
 
 function addSprite() {
   const texture = PIXI.Texture.from("./icons/ddededodediamante.png", {
-    crossorigin: true
+    crossorigin: true,
   });
   const sprite = new PIXI.Sprite(texture);
   sprite.anchor.set(0.5);
   sprite.x = 0;
   sprite.y = 0;
+  sprite.scale._parentScaleEvent = sprite;
   app.stage.addChild(sprite);
 
   const spriteData = {
@@ -247,10 +236,14 @@ function renderSpriteInfo() {
   if (!activeSprite) {
     infoEl.innerHTML = "<p>Select a sprite to see its info.</p>";
   } else {
+    const sprite = activeSprite.pixiSprite;
+
     infoEl.innerHTML = `
-    <p>x: ${Math.round(activeSprite.pixiSprite.x)}</p>
-    <p>y: ${Math.round(-activeSprite.pixiSprite.y)}</p>
-    <p>angle: ${activeSprite.pixiSprite.rotation}</p>`;
+    <p>x: ${Math.round(sprite.x)}</p>
+    <p>y: ${Math.round(-sprite.y)}</p>
+    <p>angle: ${sprite.rotation}</p>
+    <p>size: ${Math.round(((sprite.scale.x + sprite.scale.y) / 2) * 100)}</p>
+    `;
   }
 }
 
@@ -338,8 +331,6 @@ function stopAllScripts() {
 }
 
 function runCode() {
-  app.start();
-
   stopAllScripts();
   shouldStop = false;
   projectStartedTime = Date.now();
@@ -498,6 +489,17 @@ function runCode() {
         }
       }
 
+      function setSize(amount, additive) {
+        if (additive) {
+          const scaleX = spriteData.pixiSprite.scale.x + amount / 100;
+          const scaleY = spriteData.pixiSprite.scale.y + amount / 100;
+          spriteData.pixiSprite.scale.set(scaleX, scaleY);
+        } else {
+          const scale = amount / 100;
+          spriteData.pixiSprite.scale.set(scale, scale);
+        }
+      }
+
       function projectTime() {
         return (Date.now() - projectStartedTime) / 1000;
       }
@@ -517,6 +519,8 @@ function runCode() {
     }
   });
 
+  app.start();
+
   Promise.allSettled(
     flagEvents.map((callback) => {
       try {
@@ -531,10 +535,13 @@ function runCode() {
     results.forEach((res) => {
       if (res.status === "rejected") {
         const e = res.reason;
-        if (e.message === "shouldStop") return;
+        if (e?.message === "shouldStop") return;
         console.error(`Error running flag event:`, e);
       }
     });
+
+    app.stop();
+    app.render();
   });
 }
 
@@ -600,6 +607,18 @@ function saveProject() {
       };
     }),
     sounds: sprite.sounds.map((s) => ({ name: s.name, data: s.dataURL })),
+    data: {
+      x: sprite.pixiSprite.x,
+      y: sprite.pixiSprite.y,
+      scale: {
+        x: sprite.pixiSprite.scale.x,
+        y: sprite.pixiSprite.scale.y,
+      },
+      rotation: sprite.pixiSprite.rotation,
+      currentCostume: sprite.costumes.findIndex(
+        (c) => c.texture === sprite.pixiSprite.texture
+      ),
+    },
   }));
 
   const blob = new Blob([JSON.stringify(project)], {
@@ -636,6 +655,16 @@ function loadProject(e) {
         code: entry.code,
         costumes: [],
         sounds: [],
+        data: {
+          x: entry?.data?.x?? 0,
+          y: entry?.data?.y?? 0,
+          scale: {
+            x: entry?.data?.scale?.x ?? 1,
+            y: entry?.data?.scale?.y ?? 1,
+          },
+          rotation: entry?.data?.rotation ?? 0,
+          currentCostume: entry?.data?.currentCostume,
+        },
       };
 
       entry.costumes.forEach((c) => {
@@ -649,12 +678,21 @@ function loadProject(e) {
 
       const sprite = new PIXI.Sprite(spriteData.costumes[0].texture);
       sprite.anchor.set(0.5);
-      sprite.x = 0;
-      sprite.y = 0;
-      app.stage.addChild(sprite);
+      sprite.x = spriteData.data.x;
+      sprite.y = spriteData.data.y;
+      sprite.scale.x = spriteData.data.scale.x;
+      sprite.scale.x = spriteData.data.scale.x;
+      sprite.rotation = spriteData.data.rotation;
+      const cc = spriteData.data.currentCostume;
+      if (cc && spriteData.costumes[cc])
+        sprite.texture = spriteData.costumes[cc].texture;
       spriteData.pixiSprite = sprite;
+      spriteData.pixiSprite.scale._parentScaleEvent = sprite;
+
+      app.stage.addChild(sprite);
       sprites.push(spriteData);
     });
+
     setActiveSprite(sprites[0] || null);
     app.render();
   };
@@ -716,6 +754,10 @@ window.addEventListener("mousedown", (e) => {
 });
 window.addEventListener("mouseup", (e) => {
   mouseButtonsPressed[e.button] = false;
+});
+
+SpriteChangeEvents.on("scaleChanged", (sprite) => {
+  if (activeSprite.pixiSprite === sprite) renderSpriteInfo();
 });
 
 SpriteChangeEvents.on("positionChanged", (sprite) => {

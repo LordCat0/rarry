@@ -211,47 +211,6 @@ Blockly.JavaScript.forBlock["procedures_callnoreturn"] = function (
   return code + ";\n";
 };
 
-const MAX_FLYOUT_WIDTH = 340;
-
-class CustomContinuousMetrics extends ContinuousMetrics {
-  getFlyoutMetrics(visible = false) {
-    this.flyoutMetrics_ = null;
-    const m = super.getFlyoutMetrics(visible);
-    m.width = Math.min(m.width, MAX_FLYOUT_WIDTH);
-    return m;
-  }
-
-  getToolboxMetrics() {
-    this.toolboxMetrics_ = null;
-    const m = super.getToolboxMetrics();
-    m.width = Math.min(m.width, MAX_FLYOUT_WIDTH);
-    return m;
-  }
-}
-
-class CustomContinuousFlyout extends ContinuousFlyout {
-  position() {
-    super.position();
-    if (this.width_ > MAX_FLYOUT_WIDTH) {
-      this.width_ = MAX_FLYOUT_WIDTH;
-      this.svgGroup_.setAttribute("width", String(MAX_FLYOUT_WIDTH));
-    }
-  }
-
-  show(contents, gaps) {
-    super.show(contents, gaps);
-
-    this.workspace_.resizeContents();
-    this.workspace_.resize();
-    this.workspace_.scrollbar.resize();
-    Blockly.svgResize(this.workspace_);
-
-    if (this.workspace_.metricsManager.resize) {
-      this.workspace_.metricsManager.resize();
-    }
-  }
-}
-
 const SpriteChangeEvents = new PIXI.utils.EventEmitter();
 
 const originalX = Object.getOwnPropertyDescriptor(PIXI.DisplayObject.prototype, 'x');
@@ -293,3 +252,29 @@ Object.defineProperty(PIXI.Sprite.prototype, 'texture', {
     }
   }
 });
+
+const originalObsPointSet = PIXI.ObservablePoint.prototype.set;
+
+PIXI.ObservablePoint.prototype.set = function (x, y) {
+  const result = originalObsPointSet.call(this, x, y);
+  if (this._parentScaleEvent) {
+    SpriteChangeEvents.emit("scaleChanged", this._parentScaleEvent);
+  }
+  return result;
+};
+
+class ToolboxBubbleCategory extends Blockly.ToolboxCategory {
+  createIconDom_() {
+    const element = document.createElement("div");
+    element.classList.add("categoryBubble");
+    element.style.backgroundColor = this.colour_;
+    return element;
+  }
+}
+
+Blockly.registry.register(
+  Blockly.registry.Type.TOOLBOX_ITEM,
+  Blockly.ToolboxCategory.registrationName,
+  ToolboxBubbleCategory,
+  true
+);
