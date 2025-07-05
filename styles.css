@@ -40,7 +40,8 @@ input {
   color: var(--dark);
 }
 
-body {
+body,
+div#app {
   font-family: var(--font);
   background-color: var(--color1);
   overscroll-behavior: none;
@@ -58,6 +59,11 @@ header {
   align-items: center;
   padding: 0.3rem 0.5rem;
   z-index: 10;
+}
+
+header h2,
+header button:not(#theme-toggle) {
+  color: #f3f4f6;
 }
 
 .dark header {
@@ -78,14 +84,14 @@ header div {
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 button {
   font-family: var(--font);
   font-size: medium;
   font-weight: 700;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 0.9rem;
   border-radius: 0.5rem;
   border: none;
   background-color: var(--dark);
@@ -98,20 +104,35 @@ button:hover {
   background-color: var(--dark-light);
 }
 
-button.save-button {
+button.primary {
+  background-color: var(--primary);
+}
+
+button.primary:hover {
+  background-color: var(--primary-dark);
+}
+
+button.danger {
+  background-color: var(--danger);
+}
+
+button.danger:hover {
+  background-color: var(--danger-dark);
+}
+
+button.orange {
   background-color: #f18f3f;
 }
 
-button.save-button:hover {
+button.orange:hover {
   background-color: #e28940;
 }
 
-button.load-button {
+button.green {
   background-color: #2acc66;
-  cursor: pointer;
 }
 
-button.load-button:hover {
+button.green:hover {
   background-color: #28b85c;
 }
 
@@ -169,6 +190,7 @@ button.tab-button.inactive {
   flex: 1;
 }
 
+.sound-container,
 .costume-container {
   padding: 8px;
   gap: 0.5rem;
@@ -238,16 +260,19 @@ button.tab-button.inactive {
 }
 
 #sprites-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
   background-color: var(--color1);
   padding: 0.5rem;
   border-top: 2px solid var(--color3);
   overflow-y: auto;
 }
 
-#sprites-section h3 {
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
+#sprites-section div#sprite-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
 }
 
 #sprites-list {
@@ -255,8 +280,7 @@ button.tab-button.inactive {
   flex-direction: row;
   flex-wrap: wrap;
   gap: 1rem;
-  padding: 0.5rem 0;
-  max-height: 10rem;
+  max-height: 9rem;
   overflow-y: scroll;
 }
 
@@ -277,32 +301,10 @@ button.tab-button.inactive {
   color: var(--color1);
 }
 
-#add-sprite-button,
-#delete-sprite-button {
-  margin-top: 0.5rem;
-  color: var(--color1);
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  transition: background-color 0.3s;
-}
-
-#add-sprite-button {
-  background-color: var(--primary);
-}
-
-#add-sprite-button:hover {
-  background-color: var(--primary-dark);
-}
-
-#delete-sprite-button,
-button.danger {
-  background-color: var(--danger);
-}
-
-#delete-sprite-button:hover,
-button.danger:hover {
-  background-color: var(--danger-dark);
+#sprites-section-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
 }
 
 #costumes-list,
@@ -314,13 +316,65 @@ button.danger:hover {
   margin-bottom: 0.5rem;
 }
 
+#extensionButton {
+  padding: 3px;
+  margin: 0 5px;
+  margin-top: auto;
+  background: var(--primary);
+  color: var(--dark);
+  order: 99;
+  cursor: pointer;
+}
+
+.extensions-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  background-color: var(--color1);
+}
+
+.extensions-popup .extensions-list {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.7rem;
+}
+
+.extensions-list div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background-color: var(--color2);
+}
+
+.extensions-list div img {
+  border-radius: 0.5rem;
+}
+
+.extensions-list div h2 {
+  text-align: center;
+}
+
+.extensions-popup header {
+  padding: 0.7rem;
+}
+
 .blocklyMainBackground {
   stroke-width: 0;
   stroke: none;
 }
 
-.blocklyToolbox {
-  width: 103.14px;
+.blocklyToolboxCategoryGroup {
+  height: 100%;
 }
 
 .dark .blocklyToolboxCategoryIcon {
@@ -332,6 +386,14 @@ button.danger:hover {
   padding: 3px 0;
   transition: background-color 0.2s ease;
   border-left: none !important;
+}
+
+.blocklyToolboxCategory.blocklyToolboxSelected {
+  background-color: rgba(0, 0, 0, 0.3) !important;
+}
+
+.dark .blocklyToolboxCategory.blocklyToolboxSelected {
+  background-color: rgba(255, 255, 255, 0.3) !important;
 }
 
 .blocklyToolboxCategoryLabel {
@@ -354,13 +416,6 @@ button.danger:hover {
   border: 1px solid;
   width: 1.25rem;
   height: 1.25rem;
-  transition: width 0.2s, opacity 0.2s ease;
-  will-change: width, opacity;
-}
-
-.blocklyToolboxSelected .categoryBubble {
-  width: 0;
-  opacity: 0;
 }
 
 ::-webkit-scrollbar {

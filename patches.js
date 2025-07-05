@@ -1,3 +1,7 @@
+Blockly.JavaScript.INFINITE_LOOP_TRAP = `if (shouldStop) throw new Error("shouldStop");
+await new Promise(r => setTimeout(r, 16));
+`;
+
 Blockly.VerticalFlyout.prototype.getFlyoutScale = () => 0.8;
 
 [
@@ -215,6 +219,10 @@ const SpriteChangeEvents = new PIXI.utils.EventEmitter();
 
 const originalX = Object.getOwnPropertyDescriptor(PIXI.DisplayObject.prototype, 'x');
 const originalY = Object.getOwnPropertyDescriptor(PIXI.DisplayObject.prototype, 'y');
+const originalAngle = Object.getOwnPropertyDescriptor(
+  PIXI.DisplayObject.prototype,
+  "angle"
+);
 const originalTexture = Object.getOwnPropertyDescriptor(PIXI.Sprite.prototype, 'texture');
 
 Object.defineProperty(PIXI.Sprite.prototype, 'x', {
@@ -239,6 +247,17 @@ Object.defineProperty(PIXI.Sprite.prototype, 'y', {
       SpriteChangeEvents.emit('positionChanged', this); 
     }
   }
+});
+Object.defineProperty(PIXI.Sprite.prototype, "angle", {
+  get() {
+    return originalAngle.get.call(this);
+  },
+  set(value) {
+    if (this.angle !== value) {
+      originalAngle.set.call(this, value);
+      SpriteChangeEvents.emit("positionChanged", this);
+    }
+  },
 });
 
 Object.defineProperty(PIXI.Sprite.prototype, 'texture', {
