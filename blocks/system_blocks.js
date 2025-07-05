@@ -1,7 +1,6 @@
 const normalKeys = [
   ..."abcdefghijklmnopqrstuvwxyz",
-  ..."0123456789",
-  ...`!"$%&/()=?¿*-+,._<>@#`,
+  ..."abcdefghijklmnopqrstuvwxyz0123456789".toUpperCase(),
 ];
 
 Blockly.Blocks["key_pressed"] = {
@@ -12,6 +11,8 @@ Blockly.Blocks["key_pressed"] = {
         new Blockly.FieldDropdown([
           ["any", "any"],
           ["space", " "],
+          ["enter", "Enter"],
+          ["escape", "Escape"],
           ["up arrow", "ArrowUp"],
           ["down arrow", "ArrowDown"],
           ["left arrow", "ArrowLeft"],
@@ -71,6 +72,15 @@ Blockly.Blocks["all_keys_pressed"] = {
   },
 };
 
+Blockly.Blocks["mouse_over"] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField("is cursor over me?");
+    this.setOutput(true, "Boolean");
+    this.setColour("#5CB1D6");
+  },
+};
+
 Blockly.JavaScript.forBlock["key_pressed"] = function (block, generator) {
   const key = block.getFieldValue("KEY");
   const safeKey = generator.quote_(key);
@@ -93,5 +103,10 @@ Blockly.JavaScript.forBlock["mouse_button_pressed"] = function (
 
 Blockly.JavaScript.forBlock["all_keys_pressed"] = () => [
   "Object.keys(keysPressed).filter(k => keysPressed[k])",
+  Blockly.JavaScript.ORDER_NONE,
+];
+
+Blockly.JavaScript.forBlock["mouse_over"] = () => [
+  "isMouseTouchingSprite()",
   Blockly.JavaScript.ORDER_NONE,
 ];

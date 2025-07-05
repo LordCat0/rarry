@@ -7,7 +7,7 @@
   const deleteSpriteButton = document.getElementById("delete-sprite-button");
   const tabButtons = document.querySelectorAll(".tab-button");
   const tabContents = document.querySelectorAll(".tab-content");
-  const toggleBtn = document.getElementById("theme-toggle");
+  const themeToggle = document.getElementById("theme-toggle");
   const root = document.documentElement;
 
   const savedTheme = localStorage.getItem("theme");
@@ -120,12 +120,13 @@
   window.toolbox = toolbox;
   window.workspace = workspace;
 
-  toggleBtn.addEventListener("click", () => {
+  themeToggle.innerText = savedTheme === "dark" ? "Light Theme" : "Dark Theme";
+  themeToggle.addEventListener("click", () => {
     root.classList.toggle("dark");
     const isDark = root.classList.contains("dark");
     localStorage.setItem("theme", isDark ? "dark" : "light");
     workspace.setTheme(isDark ? darkTheme : lightTheme, workspace);
-    toggleBtn.innerText = isDark ? "Light Theme" : "Dark Theme";
+    themeToggle.innerText = isDark ? "Light Theme" : "Dark Theme";
   });
 
   let sprites = [];
@@ -321,14 +322,6 @@
       img.style.objectFit = "contain";
       img.src = costume.texture.baseTexture.resource.url;
 
-      let fileSizeBytes = 0;
-      const resource = costume.texture.baseTexture.resource;
-      if (resource.data && resource.data.size)
-        fileSizeBytes = resource.data.size;
-      else if (resource.source && resource.source.size)
-        fileSizeBytes = resource.source.size;
-      console.log(fileSizeBytes);
-
       const renameableLabel = createRenameableLabel(costume.name, (newName) => {
         costume.name = newName;
       });
@@ -378,7 +371,13 @@
         sizeLabel.style.marginLeft = "auto";
         sizeLabel.style.fontSize = "0.8em";
         sizeLabel.style.color = "#666";
-        sizeLabel.textContent = `${(sizeBytes / 1024).toFixed(2)} KB`;
+
+        const sizeKB = sizeBytes / 1024;
+        if (sizeKB < 1024) {
+          sizeLabel.textContent = `${sizeKB.toFixed(2)} KB`;
+        } else {
+          sizeLabel.textContent = `${(sizeKB / 1024).toFixed(2)} MB`;
+        }
       }
 
       const playButton = document.createElement("button");
@@ -505,8 +504,6 @@
 
       const code = Blockly.JavaScript.workspaceToCode(tempWorkspace);
       tempWorkspace.dispose();
-
-      console.log(code);
 
       try {
         function whenFlagClicked(callback) {
@@ -906,6 +903,12 @@
           }
         }
 
+        function isMouseTouchingSprite() {
+          const mouse = app.renderer.plugins.interaction.mouse.global;
+          const bounds = spriteData.pixiSprite.getBounds();
+          return bounds.contains(mouse.x, mouse.y);
+        }        
+
         eval(code);
       } catch (e) {
         console.error(`Error processing code for sprite ${spriteData.id}:`, e);
@@ -1191,11 +1194,33 @@
     e.returnValue = "";
   });
 
+  const allowedKeys = new Set([
+    "ArrowUp",
+    "ArrowDown",
+    "ArrowLeft",
+    "ArrowRight",
+    " ",
+    "Enter",
+    "Escape",
+    ..."abcdefghijklmnopqrstuvwxyz0123456789",
+    ..."abcdefghijklmnopqrstuvwxyz".toUpperCase()
+  ]);
   window.addEventListener("keydown", (e) => {
-    keysPressed[e.key] = true;
+    const key = e.key;
+    if (allowedKeys.has(key)) {
+      keysPressed[key] = true;
+    }
   });
   window.addEventListener("keyup", (e) => {
-    keysPressed[e.key] = false;
+    const key = e.key;
+    if (allowedKeys.has(key)) {
+      keysPressed[key] = false;
+    }
+  });
+  window.addEventListener("blur", () => {
+    for (const key in keysPressed) {
+      keysPressed[key] = false;
+    }
   });
 
   window.addEventListener("mousedown", (e) => {
