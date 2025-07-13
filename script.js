@@ -1112,21 +1112,38 @@
       try {
         data = JSON.parse(reader.result);
       } catch (error) {
-        window.alert("Invalid file provided");
+        window.alert("Invalid file: not valid JSON.");
         return;
       }
 
-      if (!data.sprites && !data.extensions)
-        data = { sprites: data, extensions: [] };
+      if (!data || typeof data !== "object") {
+        window.alert("Invalid file structure.");
+        return;
+      }
 
-      data?.extensions?.forEach((extId) => addExtension(extId));
+      if (!data.sprites && !data.extensions) {
+        data = { sprites: data, extensions: [] };
+      }
+
+      try {
+        data?.extensions?.forEach((extId) => {
+          if (typeof extId === "string") addExtension(extId);
+        });
 
       sprites.forEach((s) => app.stage.removeChild(s.pixiSprite));
       sprites = [];
-      data.sprites.forEach((entry) => {
+
+        if (!Array.isArray(data.sprites)) {
+          window.alert("No valid sprites found in file.");
+          return;
+        }
+
+        data.sprites.forEach((entry, i) => {
+          if (!entry || typeof entry !== "object") return;
+
         const spriteData = {
-          id: entry.id,
-          code: entry.code,
+            id: entry.id || `sprite-${i}`,
+            code: entry.code || "",
           costumes: [],
           sounds: [],
           data: {
@@ -1142,31 +1159,48 @@
           },
         };
 
+          if (Array.isArray(entry.costumes)) {
         entry.costumes.forEach((c) => {
+              if (!c?.data || !c.name) return;
+
+              try {
           const texture = PIXI.Texture.from(c.data);
           spriteData.costumes.push({ name: c.name, texture });
-        });
+              } catch (err) {
+                console.warn(`Failed to load costume: ${c.name}`, err);
+              }
+            });
+          }
 
-        entry.sounds.forEach((s) =>
-          spriteData.sounds.push({ name: s.name, dataURL: s.data })
-        );
+          if (Array.isArray(entry.sounds)) {
+            entry.sounds.forEach((s) => {
+              if (!s?.name || !s?.data) return;
+              spriteData.sounds.push({ name: s.name, dataURL: s.data });
+            });
+          }
 
-        const sprite = new PIXI.Sprite(spriteData.costumes[0].texture);
+          let sprite;
+          if (spriteData.costumes.length > 0) {
+            sprite = new PIXI.Sprite(spriteData.costumes[0].texture);
+          } else {
+            sprite = new PIXI.Sprite();
+          }
+
         sprite.anchor.set(0.5);
-
         sprite.x = spriteData.data.x;
         sprite.y = spriteData.data.y;
         sprite.scale.x = spriteData.data.scale.x;
-        sprite.scale.x = spriteData.data.scale.x;
+          sprite.scale.y = spriteData.data.scale.y;
 
         if (entry?.data?.angle !== null) sprite.angle = spriteData.data.angle;
         else sprite.rotation = spriteData.data.rotation;
 
         const cc = spriteData.data.currentCostume;
-        if (cc && spriteData.costumes[cc])
+          if (typeof cc === "number" && spriteData.costumes[cc]) {
           sprite.texture = spriteData.costumes[cc].texture;
-        spriteData.pixiSprite = sprite;
+          }
 
+          spriteData.pixiSprite = sprite;
         spriteData.pixiSprite.scale._parentScaleEvent = sprite;
 
         app.stage.addChild(sprite);
@@ -1174,6 +1208,10 @@
       });
 
       setActiveSprite(sprites[0] || null);
+      } catch (err) {
+        console.error("Failed to load project:", err);
+        window.alert("Something went wrong while loading the project.");
+      }
     };
     reader.readAsText(file);
   }
