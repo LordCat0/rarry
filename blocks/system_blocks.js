@@ -1,8 +1,3 @@
-const normalKeys = [
-  ..."abcdefghijklmnopqrstuvwxyz",
-  ..."abcdefghijklmnopqrstuvwxyz0123456789".toUpperCase(),
-];
-
 Blockly.Blocks["key_pressed"] = {
   init: function () {
     this.appendDummyInput()

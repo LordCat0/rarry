@@ -46,6 +46,9 @@
   penGraphics.clear();
   app.stage.addChildAt(penGraphics, 0);
 
+  let sprites = [];
+  let activeSprite = null;
+
   app.ticker.add(() => {
     sprites.forEach((spriteData) => {
       if (!spriteData.lastPos) {
@@ -138,7 +141,7 @@
     toolbox: toolbox,
     scrollbars: true,
     trashcan: true,
-    renderer: "zelos",
+    renderer: "custom_zelos",
     theme: savedTheme === "dark" ? darkTheme : lightTheme,
     zoom: {
       controls: true,
@@ -160,9 +163,6 @@
     workspace.setTheme(isDark ? darkTheme : lightTheme, workspace);
     themeToggle.innerText = isDark ? "Light Theme" : "Dark Theme";
   });
-
-  let sprites = [];
-  let activeSprite = null;
 
   function addSprite() {
     const texture = PIXI.Texture.from("./icons/ddededodediamante.png", {

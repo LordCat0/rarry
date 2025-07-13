@@ -1,8 +1,45 @@
+const normalKeys = [
+  ..."abcdefghijklmnopqrstuvwxyz",
+  ..."abcdefghijklmnopqrstuvwxyz0123456789".toUpperCase(),
+];
+
 Blockly.Blocks["when_flag_clicked"] = {
   init: function () {
-    this.appendDummyInput().appendField("when 🏁 clicked");
+    this.appendDummyInput()
+      .appendField("when")
+      .appendField(
+        new Blockly.FieldImage("icons/flag.svg", 25, 25, {
+          alt: "Green flag",
+          flipRtl: "FALSE",
+        })
+      )
+      .appendField("clicked");
     this.appendStatementInput("DO").setCheck(null);
-    this.setColour("#ffc400");
+    this.setStyle("events_blocks");
+  },
+};
+
+Blockly.Blocks["when_key_pressed"] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField("when")
+      .appendField(
+        new Blockly.FieldDropdown([
+          ["any", "any"],
+          ["space", " "],
+          ["enter", "Enter"],
+          ["escape", "Escape"],
+          ["up arrow", "ArrowUp"],
+          ["down arrow", "ArrowDown"],
+          ["left arrow", "ArrowLeft"],
+          ["right arrow", "ArrowRight"],
+          ...normalKeys.map((i) => [i, i]),
+        ]),
+        "KEY"
+      )
+      .appendField("pressed");
+    this.appendStatementInput("DO").setCheck(null);
+    this.setStyle("events_blocks");
   },
 };
 
@@ -10,13 +47,20 @@ Blockly.Blocks["project_timer"] = {
   init: function () {
     this.appendDummyInput().appendField("project timer");
     this.setOutput(true, "Number");
-    this.setColour("#ffc400");
+    this.setStyle("events_blocks");
   },
 };
 
 Blockly.JavaScript.forBlock["when_flag_clicked"] = function (block, generator) {
   const branch = generator.statementToCode(block, "DO");
   return `whenFlagClicked(async () => {\n${branch}});\n`;
+};
+
+Blockly.JavaScript.forBlock["when_key_pressed"] = function (block, generator) {
+  const branch = generator.statementToCode(block, "DO");
+  const key = block.getFieldValue("KEY");
+  const safeKey = generator.quote_(key);
+  return `whenKeyPressed(${safeKey}, async () => {\n${branch}});\n`;
 };
 
 Blockly.JavaScript.forBlock["project_timer"] = function (block) {
