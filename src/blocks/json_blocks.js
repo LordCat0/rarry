@@ -237,9 +237,7 @@ Blockly.Blocks["json_create"] = {
           Blockly.inputs.Align.RIGHT
         );
         input.setCheck("ObjectItem");
-        if (i === 0) {
-          input.appendField("create object with");
-        }
+        if (i === 0) input.appendField("create object with");
       }
     }
 
@@ -420,10 +418,7 @@ Blockly.Blocks["json_parse"] = {
   },
 };
 
-BlocklyJS.javascriptGenerator.forBlock["json_parse"] = function (
-  block,
-  generator
-) {
+BlocklyJS.javascriptGenerator.forBlock["json_parse"] = function (block) {
   const input =
     BlocklyJS.javascriptGenerator.valueToCode(
       block,
@@ -437,4 +432,25 @@ BlocklyJS.javascriptGenerator.forBlock["json_parse"] = function (
   } else if (mode === "STRINGIFY") {
     return [`JSON.stringify(${input})`, BlocklyJS.Order.NONE];
   }
+};
+
+Blockly.Blocks["json_clone"] = {
+  init: function () {
+    this.appendValueInput("OBJECT")
+      .setCheck("Object")
+      .appendField("clone object");
+    this.setOutput(true, "Object");
+    this.setStyle("json_category");
+    this.setTooltip("Creates a deep clone of a JSON-compatible object.");
+  },
+};
+
+BlocklyJS.javascriptGenerator.forBlock["json_clone"] = function (block) {
+  const obj =
+    BlocklyJS.javascriptGenerator.valueToCode(
+      block,
+      "OBJECT",
+      BlocklyJS.Order.ATOMIC
+    ) || "{}";
+  return [`JSON.parse(JSON.stringify(${obj}))`, BlocklyJS.Order.FUNCTION_CALL];
 };
