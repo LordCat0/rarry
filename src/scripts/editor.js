@@ -1,6 +1,7 @@
 import * as Blockly from "blockly";
 import * as BlocklyJS from "blockly/javascript";
 import * as PIXI from "pixi.js";
+import pako from "pako";
 
 import CustomRenderer from "./render.js";
 import { SpriteChangeEvents } from "./patches.js";
@@ -1154,11 +1155,14 @@ function saveProject() {
       },
     })),
     extensions: activeExtensions,
+    variables: window.projectVariables ?? {},
   };
 
-  const blob = new Blob([JSON.stringify(project)], {
-    type: "application/json",
-  });
+  const json = JSON.stringify(project);
+  const utf8 = new TextEncoder().encode(json);
+  const deflated = pako.deflate(utf8, { level: 9 });
+
+  const blob = new Blob([deflated], { type: "application/octet-stream" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -1173,13 +1177,24 @@ function loadProject(e) {
 
   const reader = new FileReader();
   reader.onload = () => {
+    const buffer = reader.result;
+    
     let data;
 
     try {
-      data = JSON.parse(reader.result);
-    } catch (error) {
-      window.alert("Invalid file: not valid JSON.");
-      return;
+      const text =
+        typeof buffer === "string" ? buffer : new TextDecoder().decode(buffer);
+      data = JSON.parse(text);
+    } catch (e1) {
+      try {
+        const compressed = new Uint8Array(buffer);
+        const inflated = pako.inflate(compressed);
+        const json = new TextDecoder().decode(inflated);
+        data = JSON.parse(json);
+      } catch (e2) {
+        console.error("Failed to parse file", e2);
+        return window.alert("Invalid or corrupted project file.");
+      }
     }
 
     if (!data || typeof data !== "object") {
@@ -1273,13 +1288,15 @@ function loadProject(e) {
         sprites.push(spriteData);
       });
 
+      if (data.variables) window.projectVariables = data.variables;
+
       setActiveSprite(sprites[0] || null);
     } catch (err) {
       console.error("Failed to load project:", err);
       window.alert("Something went wrong while loading the project.");
     }
   };
-  reader.readAsText(file);
+  reader.readAsArrayBuffer(file);
 }
 
 document.getElementById("save-button").addEventListener("click", saveProject);
