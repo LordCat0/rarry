@@ -678,6 +678,7 @@ async function runCode() {
         runningScripts,
         signal,
         promiseWithAbort,
+        PIXI
       });
     } catch (e) {
       console.error(`Error processing code for sprite ${spriteData.id}:`, e);
@@ -1504,7 +1505,8 @@ async function generateStandaloneHTML() {
             playingSounds,
             runningScripts,
             promiseWithAbort,
-            signal
+            signal,
+            PIXI
           });
         } catch (e) {
           console.error(\`Error processing code for sprite \${spriteData.id}:\`, e);

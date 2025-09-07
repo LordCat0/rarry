@@ -1,4 +1,3 @@
-import * as PIXI from "pixi.js";
 import { calculateBubblePosition } from "./editor";
 
 export function runCodeWithFunctions({
@@ -14,6 +13,7 @@ export function runCodeWithFunctions({
   playingSounds,
   promiseWithAbort,
   signal,
+  PIXI
 }) {
   function whenFlagClicked(callback) {
     if (
