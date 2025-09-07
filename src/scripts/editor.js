@@ -5,6 +5,7 @@ import pako from "pako";
 
 import CustomRenderer from "./render.js";
 import { SpriteChangeEvents } from "./patches.js";
+import { runCodeWithFunctions } from "./functions.js";
 import.meta.glob("../blocks/**/*.js", { eager: true });
 
 BlocklyJS.javascriptGenerator.addReservedWords(
@@ -43,7 +44,7 @@ const app = new PIXI.Application({
 app.stageWidth = BASE_WIDTH;
 app.stageHeight = BASE_HEIGHT;
 
-function resizeCanvas() {
+export function resizeCanvas() {
   const w = wrapper.clientWidth;
   const h = wrapper.clientHeight;
 
@@ -66,8 +67,8 @@ app.stage.addChildAt(penGraphics, 0);
 
 window.projectVariables = {};
 
-let sprites = [];
-let activeSprite = null;
+export let sprites = [];
+export let activeSprite = null;
 
 app.ticker.add(() => {
   sprites.forEach((spriteData) => {
@@ -162,7 +163,7 @@ const darkTheme = Blockly.Theme.defineTheme("customDarkTheme", {
 Blockly.blockRendering.register("custom_zelos", CustomRenderer);
 
 const toolbox = document.getElementById("toolbox");
-const workspace = Blockly.inject("blocklyDiv", {
+export const workspace = Blockly.inject("blocklyDiv", {
   toolbox: toolbox,
   scrollbars: true,
   trashcan: true,
@@ -246,7 +247,7 @@ themeToggle.addEventListener("click", () => {
   themeToggle.innerText = isDark ? "Light Theme" : "Dark Theme";
 });
 
-function addSprite() {
+export function addSprite() {
   const texture = PIXI.Texture.from("./icons/ddededodediamante.png", {
     crossorigin: true,
   });
@@ -268,7 +269,7 @@ function addSprite() {
   setActiveSprite(spriteData);
 }
 
-function setActiveSprite(spriteData) {
+export function setActiveSprite(spriteData) {
   activeSprite = spriteData;
   renderSpritesList(true);
   workspace.clear();
@@ -285,7 +286,7 @@ function setActiveSprite(spriteData) {
   Blockly.Xml.domToWorkspace(xmlDom, workspace);
 }
 
-function deleteActiveSprite() {
+export function deleteActiveSprite() {
   if (!activeSprite) return;
 
   if (activeSprite.currentBubble) {
@@ -308,7 +309,7 @@ function deleteActiveSprite() {
   }
 }
 
-function renderSpritesList(renderOthers = false) {
+export function renderSpritesList(renderOthers = false) {
   const listEl = document.getElementById("sprites-list");
   listEl.innerHTML = "";
   if (sprites.length === 0) listEl.style.display = "none";
@@ -344,7 +345,7 @@ function renderSpritesList(renderOthers = false) {
   }
 }
 
-function renderSpriteInfo() {
+export function renderSpriteInfo() {
   const infoEl = document.getElementById("sprite-info");
 
   if (!activeSprite) {
@@ -424,7 +425,7 @@ function createDeleteButton(onDelete) {
   return img;
 }
 
-function renderCostumesList() {
+export function renderCostumesList() {
   costumesList.innerHTML = "";
 
   if (!activeSprite || !activeSprite.costumes) return;
@@ -459,7 +460,7 @@ function renderCostumesList() {
   });
 }
 
-function renderSoundsList() {
+export function renderSoundsList() {
   const soundsList = document.getElementById("sounds-list");
   soundsList.innerHTML = "";
 
@@ -538,7 +539,7 @@ function renderSoundsList() {
   });
 }
 
-function calculateBubblePosition(
+export function calculateBubblePosition(
   sprite,
   bubbleWidth,
   bubbleHeight,
@@ -563,27 +564,62 @@ const keysPressed = {};
 const mouseButtonsPressed = {};
 const playingSounds = new Map();
 
+let currentRunId = 0;
+let currentRunController = null;
 const flagEvents = [];
 const runningScripts = [];
-let currentRunId = 0;
 window.shouldStop = false;
+
+function promiseWithAbort(promiseOrFn, signal) {
+  try {
+    const p = typeof promiseOrFn === "function" ? promiseOrFn() : promiseOrFn;
+    if (!(p instanceof Promise)) return Promise.resolve(p);
+
+    if (signal.aborted) return Promise.reject(new Error("shouldStop"));
+
+    return Promise.race([
+      p,
+      new Promise((_, rej) => {
+        signal.addEventListener("abort", () => rej(new Error("shouldStop")), {
+          once: true,
+        });
+      }),
+    ]);
+  } catch (err) {
+    return Promise.reject(err);
+  }
+}
 
 function stopAllScripts() {
   window.shouldStop = true;
+
+  if (currentRunController) {
+    try {
+      currentRunController.abort();
+    } catch (e) {}
+    currentRunController = null;
+  }
   currentRunId++;
 
   runningScripts.forEach((i) => {
     if (i.type === "timeout") clearTimeout(i.id);
+    else if (i.type === "interval") clearInterval(i.id);
     else if (i.type === "raf") cancelAnimationFrame(i.id);
   });
   runningScripts.length = 0;
+
   flagEvents.length = 0;
-  Object.assign(keysPressed, {});
-  Object.assign(mouseButtonsPressed, {});
+
+  Object.keys(keysPressed).forEach((k) => delete keysPressed[k]);
+  Object.keys(mouseButtonsPressed).forEach(
+    (k) => delete mouseButtonsPressed[k]
+  );
 
   sprites.forEach((spriteData) => {
     if (spriteData.currentBubble) {
-      app.stage.removeChild(spriteData.currentBubble);
+      try {
+        app.stage.removeChild(spriteData.currentBubble);
+      } catch (e) {}
       spriteData.currentBubble = null;
     }
     if (spriteData.sayTimeout != null) {
@@ -601,11 +637,17 @@ function stopAllScripts() {
   playingSounds.clear();
 }
 
-function runCode() {
+async function runCode() {
   stopAllScripts();
-  window.shouldStop = false;
+
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+
+  const controller = new AbortController();
+  const signal = controller.signal;
+  currentRunController = controller;
+
   let projectStartedTime = Date.now();
-  let thisRun = currentRunId;
+  let thisRun = Number(currentRunId);
 
   sprites.forEach((spriteData) => {
     const tempWorkspace = new Blockly.Workspace();
@@ -621,440 +663,36 @@ function runCode() {
     tempWorkspace.dispose();
 
     try {
-      function whenFlagClicked(callback) {
-        if (thisRun !== currentRunId || window.shouldStop) return;
-        flagEvents.push(async () => {
-          if (thisRun !== currentRunId || window.shouldStop) return;
-          try {
-            await callback();
-          } catch (e) {
-            if (e?.message === "shouldStop") return;
-            console.error(e);
-          }
-        });
-      }
-
-      function moveSteps(steps) {
-        if (thisRun !== currentRunId || window.shouldStop) return;
-        const sprite = spriteData.pixiSprite;
-        const angle = sprite.rotation;
-        sprite.x += Math.cos(angle) * Number(steps);
-        sprite.y += Math.sin(angle) * Number(steps);
-      }
-
-      function changePosition(menu, amount) {
-        if (thisRun !== currentRunId || window.shouldStop) return;
-        const sprite = spriteData.pixiSprite;
-        if (menu === "x") sprite.x += Number(amount);
-        else if (menu === "y") sprite.y -= Number(amount);
-      }
-
-      function setPosition(menu, amount) {
-        if (thisRun !== currentRunId || window.shouldStop) return;
-        const sprite = spriteData.pixiSprite;
-        if (menu === "x") sprite.x = Number(amount);
-        else if (menu === "y") sprite.y = -Number(amount);
-      }
-
-      function getPosition(menu) {
-        const sprite = spriteData.pixiSprite;
-        if (menu === "x") return sprite.x;
-        else if (menu === "y") return -sprite.y;
-      }
-
-      const getAngle = () => spriteData.pixiSprite.angle;
-
-      function getMousePosition(menu) {
-        const mouse = app.renderer.plugins.interaction.mouse.global;
-        if (menu === "x")
-          return Math.round(
-            (mouse.x - app.renderer.width / 2) / app.stage.scale.x
-          );
-        else if (menu === "y")
-          return -Math.round(
-            (mouse.y - app.renderer.height / 2) / app.stage.scale.y
-          );
-      }
-
-      function sayMessage(message, seconds) {
-        if (thisRun !== currentRunId) return;
-
-        if (spriteData.currentBubble) {
-          app.stage.removeChild(spriteData.currentBubble);
-          spriteData.currentBubble = null;
-        }
-        if (spriteData.sayTimeout != null) {
-          clearTimeout(spriteData.sayTimeout);
-          spriteData.sayTimeout = null;
-        }
-
-        if (window.shouldStop) return;
-
-        message = String(message);
-        if (!message || message === "") return;
-
-        const padding = 10;
-        const tailHeight = 15;
-        const tailWidth = 15;
-        const bubbleColor = 0xffffff;
-        const lineColor = 0xbdc1c7;
-        const textColor = 0x000000;
-
-        const bubble = new PIXI.Graphics();
-
-        const style = new PIXI.TextStyle({
-          fill: textColor,
-          fontSize: 24,
-        });
-        const text = new PIXI.Text(message, style);
-
-        const bubbleWidth = text.width + padding * 2;
-        const bubbleHeight = text.height + padding * 2;
-
-        bubble.beginFill(bubbleColor);
-        bubble.lineStyle(2, lineColor);
-        bubble.drawRoundedRect(0, 0, bubbleWidth, bubbleHeight, 10);
-
-        bubble.moveTo(bubbleWidth / 2 - tailWidth / 2, bubbleHeight);
-        bubble.lineTo(bubbleWidth / 2, bubbleHeight + tailHeight);
-        bubble.lineTo(bubbleWidth / 2 + tailWidth / 2, bubbleHeight);
-        bubble.closePath();
-        bubble.endFill();
-
-        text.x = padding;
-        text.y = padding;
-
-        const container = new PIXI.Container();
-        container.addChild(bubble);
-        container.addChild(text);
-
-        const pos = calculateBubblePosition(
-          spriteData.pixiSprite,
-          bubbleWidth,
-          bubbleHeight,
-          tailHeight
-        );
-        container.x = pos.x;
-        container.y = pos.y;
-
-        app.stage.addChild(container);
-        spriteData.currentBubble = container;
-
-        if (typeof seconds !== "number" || seconds <= 0 || seconds > 2147483647)
-          return;
-
-        spriteData.sayTimeout = setTimeout(() => {
-          if (spriteData.currentBubble === container) {
-            app.stage.removeChild(container);
-            spriteData.currentBubble = null;
-          }
-          spriteData.sayTimeout = null;
-        }, seconds * 1000);
-      }
-
-      function waitOneFrame() {
-        return new Promise((res, rej) => {
-          if (window.shouldStop || thisRun !== currentRunId)
-            return rej("stopped");
-
-          const id = requestAnimationFrame(() => {
-            if (window.shouldStop || thisRun !== currentRunId)
-              return rej("stopped");
-            runningScripts.splice(
-              runningScripts.findIndex((t) => t.id === id),
-              1
-            );
-            res();
-          });
-          runningScripts.push({ type: "raf", id });
-        });
-      }
-
-      function wait(ms) {
-        return new Promise((res, rej) => {
-          if (window.shouldStop || thisRun !== currentRunId)
-            return rej("stopped");
-
-          const id = setTimeout(() => {
-            if (window.shouldStop || thisRun !== currentRunId)
-              return rej("stopped");
-            runningScripts.splice(
-              runningScripts.findIndex((t) => t.id === id),
-              1
-            );
-            res();
-          }, ms);
-          runningScripts.push({ type: "timeout", id });
-        });
-      }
-
-      function switchCostume(name) {
-        if (thisRun !== currentRunId || window.shouldStop) return;
-
-        const found = spriteData.costumes.find((c) => c.name === name);
-        if (found) {
-          spriteData.pixiSprite.texture = found.texture;
-        }
-      }
-
-      function setSize(amount, additive) {
-        if (thisRun !== currentRunId || window.shouldStop) return;
-
-        if (additive) {
-          const scaleX = spriteData.pixiSprite.scale.x + amount / 100;
-          const scaleY = spriteData.pixiSprite.scale.y + amount / 100;
-          spriteData.pixiSprite.scale.set(scaleX, scaleY);
-        } else {
-          const scale = amount / 100;
-          spriteData.pixiSprite.scale.set(scale, scale);
-        }
-      }
-
-      function setAngle(amount, additive) {
-        if (thisRun !== currentRunId || window.shouldStop) return;
-
-        if (additive) {
-          spriteData.pixiSprite.angle =
-            (spriteData.pixiSprite.angle + amount) % 360;
-        } else {
-          spriteData.pixiSprite.angle = amount % 360;
-        }
-
-        if (spriteData.pixiSprite.angle < 0) {
-          spriteData.pixiSprite.angle += 360;
-        }
-      }
-
-      function projectTime() {
-        return (Date.now() - projectStartedTime) / 1000;
-      }
-
-      function isKeyPressed(key) {
-        if (key === "any") {
-          return Object.values(keysPressed).some((pressed) => pressed);
-        }
-
-        return !!keysPressed[key];
-      }
-
-      function isMouseButtonPressed(button) {
-        if (button === "any") {
-          return Object.values(mouseButtonsPressed).some((pressed) => pressed);
-        }
-
-        return !!mouseButtonsPressed[Number(button)];
-      }
-
-      function getCostumeSize(type) {
-        const frame = spriteData?.pixiSprite?.texture?.frame;
-        if (!frame) return 0;
-
-        if (type === "width") {
-          return frame.width;
-        } else if (type === "height") {
-          return frame.height;
-        } else {
-          return 0;
-        }
-      }
-
-      function getSpriteScale() {
-        const scaleX = spriteData.pixiSprite.scale.x;
-        const scaleY = spriteData.pixiSprite.scale.y;
-        return ((scaleX + scaleY) / 2) * 100;
-      }
-
-      function _startTween({
-        from,
-        to,
-        duration,
-        easing,
-        onUpdate,
-        wait = true,
-      }) {
-        if (thisRun !== currentRunId) return;
-        const tweenPromise = new Promise((resolve, reject) => {
-          const start = performance.now();
-          const change = to - from;
-          const easeFn =
-            window.TweenEasing[easing] || window.TweenEasing.linear;
-
-          function tick(now) {
-            if (window.shouldStop || thisRun !== currentRunId) return resolve();
-
-            const t = Math.min((now - start) / (duration * 1000), 1);
-            const value = from + change * easeFn(t);
-
-            try {
-              onUpdate && onUpdate(value);
-            } catch (err) {
-              if (err.message === "shouldStop") return resolve();
-              return reject(err);
-            }
-
-            if (t < 1) {
-              requestAnimationFrame(tick);
-            } else {
-              resolve();
-            }
-          }
-
-          const id = requestAnimationFrame(tick);
-          runningScripts.push({ type: "raf", id });
-        });
-
-        return wait ? tweenPromise : undefined;
-      }
-
-      async function startTween(options) {
-        try {
-          if (thisRun !== currentRunId) return;
-          await _startTween(options);
-        } catch (err) {
-          if (err.message === "shouldStop") {
-            return;
-          } else {
-            console.error(err);
-          }
-        }
-      }
-
-      let soundProperties = {
-        volume: 100,
-        speed: 100,
-      };
-
-      const getSoundProperty = (property) => soundProperties[property];
-      function setSoundProperty(property, value) {
-        if (!soundProperties[property]) return;
-        if (property === "speed") value = Math.min(1600, Math.max(7, value));
-        if (property === "volume") value = Math.min(100, Math.max(0, value));
-        soundProperties[property] = value;
-      }
-
-      async function playSound(name, wait = false) {
-        const sound = spriteData.sounds.find((s) => s.name === name);
-        if (!sound) return;
-
-        if (!playingSounds.has(spriteData.id))
-          playingSounds.set(spriteData.id, new Map());
-
-        const spriteSounds = playingSounds.get(spriteData.id);
-
-        const oldAudio = spriteSounds.get(name);
-        if (oldAudio) {
-          oldAudio.pause();
-          oldAudio.currentTime = 0;
-        }
-
-        const audio = new Audio(sound.dataURL);
-        spriteSounds.set(name, audio);
-
-        audio.volume = soundProperties.volume / 100;
-        audio.playbackRate = soundProperties.speed / 100;
-        audio.play();
-
-        const cleanup = () => {
-          if (spriteSounds.get(name) === audio) {
-            spriteSounds.delete(name);
-          }
-        };
-
-        audio.addEventListener("ended", cleanup);
-        audio.addEventListener("pause", cleanup);
-
-        if (wait) {
-          return new Promise((res) => {
-            audio.addEventListener("ended", () => res());
-          });
-        }
-      }
-
-      function stopSound(name) {
-        const spriteSounds = playingSounds.get(spriteData.id);
-        if (!spriteSounds || !spriteSounds.has(name)) return;
-
-        const audio = spriteSounds.get(name);
-        audio.pause();
-        audio.currentTime = 0;
-        spriteSounds.delete(name);
-      }
-
-      function stopAllSounds(thisSprite = false) {
-        if (thisSprite) {
-          const spriteSounds = playingSounds.get(spriteData.id);
-          if (!spriteSounds) return;
-
-          for (const audio of spriteSounds.values()) {
-            audio.pause();
-            audio.currentTime = 0;
-          }
-
-          playingSounds.delete(spriteData.id);
-        } else {
-          for (const spriteSounds of playingSounds.values()) {
-            for (const audio of spriteSounds.values()) {
-              audio.pause();
-              audio.currentTime = 0;
-            }
-          }
-          playingSounds.clear();
-        }
-      }
-
-      function isMouseTouchingSprite() {
-        const mouse = app.renderer.plugins.interaction.mouse.global;
-        const bounds = spriteData.pixiSprite.getBounds();
-        return bounds.contains(mouse.x, mouse.y);
-      }
-
-      function setPenStatus(active) {
-        spriteData.penDown = !!active;
-      }
-
-      const setPenColor = (r = 0, g = 0, b = 0) => {
-        if (typeof r === "string") {
-          const [r_, g_, b_] = r.split(",").map((s) => parseInt(s.trim()));
-          spriteData.penColor = { r: r_, g: g_, b: b_ };
-        } else {
-          spriteData.penColor = { r, g, b };
-        }
-      };
-      const setPenColorHex = (value) => {
-        var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(value);
-        spriteData.penColor = result
-          ? {
-              r: parseInt(result[1], 16),
-              g: parseInt(result[2], 16),
-              b: parseInt(result[3], 16),
-            }
-          : { r: 0, g: 0, b: 0 };
-      };
-
-      function setPenSize(size) {
-        spriteData.penSize = size;
-      }
-
-      function clearPen() {
-        penGraphics.clear();
-      }
-
-      eval(code);
+      window.shouldStop = false;
+      runCodeWithFunctions({
+        code,
+        thisRun,
+        currentRunId,
+        projectStartedTime,
+        spriteData,
+        app,
+        flagEvents,
+        mouseButtonsPressed,
+        keysPressed,
+        playingSounds,
+        runningScripts,
+        signal,
+        promiseWithAbort,
+      });
     } catch (e) {
       console.error(`Error processing code for sprite ${spriteData.id}:`, e);
     }
   });
 
+  const eventsForThisRun = flagEvents.filter((e) => e.runId === thisRun);
+
+  for (const e of eventsForThisRun) {
+    const idx = flagEvents.indexOf(e);
+    if (idx !== -1) flagEvents.splice(idx, 1);
+  }
+
   Promise.allSettled(
-    flagEvents.map((callback) => {
-      try {
-        const result = callback();
-        if (result instanceof Promise) return result;
-        return Promise.resolve(result);
-      } catch (e) {
-        return Promise.reject(e);
-      }
-    })
+    eventsForThisRun.map((entry) => promiseWithAbort(entry.cb, signal))
   ).then((results) => {
     results.forEach((res) => {
       if (res.status === "rejected") {
@@ -1178,7 +816,7 @@ function loadProject(e) {
   const reader = new FileReader();
   reader.onload = () => {
     const buffer = reader.result;
-    
+
     let data;
 
     try {
@@ -1528,7 +1166,7 @@ function addExtensionButton() {
   toolboxDiv.appendChild(button);
 }
 
-function addExtension(id) {
+export function addExtension(id) {
   if (activeExtensions.includes(id)) return;
 
   const extension = extensions.find((e) => e?.id === id);
@@ -1576,3 +1214,421 @@ fullscreenButton.addEventListener("click", () => {
   }">`;
   resizeCanvas();
 });
+
+import Sortable from "sortablejs";
+
+Sortable.create(document.querySelector("div.tab-header"), { animation: 150 });
+Sortable.create(document.querySelector("div#stage-controls"), {
+  animation: 150,
+});
+Sortable.create(document.querySelector("div.blocklyToolboxCategoryGroup"), {
+  animation: 150,
+  onStart: () => {
+    document.body.classList.add("draggingBlocklyToolboxCategory");
+  },
+  onEnd: () => {
+    document.body.classList.remove("draggingBlocklyToolboxCategory");
+  },
+});
+
+import { minify } from "terser";
+async function minifyScript(code) {
+  const result = await minify(code, {
+    ecma: 2020,
+    module: true,
+    compress: {
+      passes: 3,
+      drop_console: true,
+      drop_debugger: true,
+      unused: true,
+      collapse_vars: true,
+      reduce_vars: true,
+      booleans: true,
+      if_return: true,
+      sequences: true,
+      conditionals: true,
+      join_vars: true,
+    },
+    mangle: true,
+    format: {
+      comments: false,
+      beautify: false,
+      semicolons: true,
+      quote_style: 1,
+      inline_script: true,
+    },
+  });
+  return result.code;
+}
+
+async function generateStandaloneHTML() {
+  async function fetchSvgDataURL(path) {
+    const svgText = await (await fetch(path)).text();
+    const base64 = btoa(svgText);
+    return `data:image/svg+xml;base64,${base64}`;
+  }
+
+  const project = {
+    sprites: sprites.map((sprite) => {
+      const tempWorkspace = new Blockly.Workspace();
+      BlocklyJS.javascriptGenerator.init(tempWorkspace);
+
+      const xmlText =
+        sprite.code ||
+        '<xml xmlns="https://developers.google.com/blockly/xml"></xml>';
+      const xmlDom = Blockly.utils.xml.textToDom(xmlText);
+      Blockly.Xml.domToWorkspace(xmlDom, tempWorkspace);
+
+      const code = BlocklyJS.javascriptGenerator.workspaceToCode(tempWorkspace);
+      tempWorkspace.dispose();
+
+      return {
+        id: sprite.id,
+        code,
+        costumes: sprite.costumes.map((c) => {
+          let dataURL;
+
+          const url = c?.texture?.baseTexture?.resource?.url;
+          if (typeof url === "string" && url.startsWith("data:")) {
+            dataURL = url;
+          } else {
+            dataURL = app.renderer.extract.base64(new PIXI.Sprite(c.texture));
+          }
+
+          return {
+            name: c.name,
+            data: dataURL,
+          };
+        }),
+        sounds: sprite.sounds.map((s) => ({ name: s.name, data: s.dataURL })),
+        data: {
+          x: sprite.pixiSprite.x,
+          y: sprite.pixiSprite.y,
+          scale: {
+            x: sprite.pixiSprite.scale.x ?? 1,
+            y: sprite.pixiSprite.scale.y ?? 1,
+          },
+          angle: sprite.pixiSprite.angle,
+          currentCostume: sprite.costumes.findIndex(
+            (c) => c.texture === sprite.pixiSprite.texture
+          ),
+        },
+      };
+    }),
+    variables: window.projectVariables ?? {},
+  };
+
+  const pixiMinJs = await (
+    await fetch("https://cdn.jsdelivr.net/npm/pixi.js@5.3.3/dist/pixi.min.js")
+  ).text();
+
+  const scriptContent = `
+  const PROJECT = ${JSON.stringify(project)};
+  (function(){
+    const stageContainer = document.getElementById("stage");
+    const wrapper = document.getElementById("stage-wrapper");
+    const fullscreenButton = document.getElementById("fullscreen-button");
+    const keysPressed = {};
+    const mouseButtonsPressed = {};
+    const playingSounds = new Map();
+    const flagEvents = [];
+    const runningScripts = [];
+    let currentRunId = 0;
+    let currentRunController = null;
+    window.shouldStop = false;
+    const BASE_WIDTH = ${BASE_WIDTH};const BASE_HEIGHT = ${BASE_HEIGHT};
+    const app = new PIXI.Application({
+      width: BASE_WIDTH,
+      height: BASE_HEIGHT,
+      backgroundColor: 0xffffff,
+      powerPreference: "high-performance",
+    });
+    app.stageWidth = BASE_WIDTH;
+    app.stageHeight = BASE_HEIGHT;
+    ${resizeCanvas.toString()}
+    resizeCanvas();
+    window.addEventListener("resize", () => {resizeCanvas()});
+    const allowedKeys = new Set([
+      "ArrowUp",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowRight",
+      " ",
+      "Enter",
+      "Escape",
+      ..."abcdefghijklmnopqrstuvwxyz0123456789",
+      ..."abcdefghijklmnopqrstuvwxyz".toUpperCase(),
+    ]);
+    window.addEventListener("keydown", (e) => {
+      const key = e.key;
+      if (allowedKeys.has(key)) {
+        keysPressed[key] = true;
+      }
+    });
+    window.addEventListener("keyup", (e) => {
+      const key = e.key;
+      if (allowedKeys.has(key)) {
+        keysPressed[key] = false;
+      }
+    });
+    window.addEventListener("blur", () => {
+      for (const key in keysPressed) {
+        keysPressed[key] = false;
+      }
+    });
+    window.addEventListener("mousedown", (e) => {
+      mouseButtonsPressed[e.button] = true;
+    });
+    window.addEventListener("mouseup", (e) => {
+      mouseButtonsPressed[e.button] = false;
+    });
+    stageContainer.appendChild(app.view);
+    const penGraphics = new PIXI.Graphics();
+    penGraphics.clear();
+    app.stage.addChildAt(penGraphics, 0);
+    const sprites = [];
+    if (PROJECT.variables) window.projectVariables = PROJECT.variables;
+    PROJECT.sprites.forEach((entry, i) => {
+      if (!entry || typeof entry !== "object") return;
+      const spriteData = {
+        id: entry.id || \`sprite-\${i}\`,
+        code: entry.code || "",
+        costumes: [],
+        sounds: [],
+        data: {
+          x: entry?.data?.x ?? 0,
+          y: entry?.data?.y ?? 0,
+          scale: {
+            x: entry?.data?.scale?.x ?? 1,
+            y: entry?.data?.scale?.y ?? 1,
+          },
+          angle: entry?.data?.angle ?? 0,
+          rotation: entry?.data?.rotation ?? 0,
+          currentCostume: entry?.data?.currentCostume,
+        },
+      };
+      if (Array.isArray(entry.costumes)) {
+        entry.costumes.forEach((c) => {
+          if (!c?.data || !c.name) return;
+          try {
+            const texture = PIXI.Texture.from(c.data);
+            spriteData.costumes.push({ name: c.name, texture });
+          } catch (err) {
+            console.warn(\`Failed to load costume: \${c.name}\`, err);
+          }
+        });
+      }
+      if (Array.isArray(entry.sounds)) {
+        entry.sounds.forEach((s) => {
+          if (!s?.name || !s?.data) return;
+          spriteData.sounds.push({ name: s.name, dataURL: s.data });
+        });
+      }
+      let sprite;
+      if (spriteData.costumes.length > 0) {
+        sprite = new PIXI.Sprite(spriteData.costumes[0].texture);
+      } else {
+        sprite = new PIXI.Sprite();
+      }
+      sprite.anchor.set(0.5);
+      sprite.x = spriteData.data.x;
+      sprite.y = spriteData.data.y;
+      sprite.scale.x = spriteData.data.scale.x;
+      sprite.scale.y = spriteData.data.scale.y;
+      if (entry?.data?.angle !== null) sprite.angle = spriteData.data.angle;
+      else sprite.rotation = spriteData.data.rotation;
+      const cc = spriteData.data.currentCostume;
+      if (typeof cc === "number" && spriteData.costumes[cc]) {
+        sprite.texture = spriteData.costumes[cc].texture;
+      }
+      spriteData.pixiSprite = sprite;
+      spriteData.pixiSprite.scale._parentScaleEvent = sprite;
+      app.stage.addChild(sprite);
+      sprites.push(spriteData);
+    });
+    ${calculateBubblePosition.toString()}
+    ${promiseWithAbort.toString()}
+    ${stopAllScripts.toString()}
+    ${runCodeWithFunctions.toString()}
+    async function runCode() {
+      stopAllScripts();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const controller = new AbortController();
+      const signal = controller.signal;
+      currentRunController = controller;
+      let projectStartedTime = Date.now();
+      let thisRun = Number(currentRunId);
+      sprites.forEach((spriteData) => {
+        window.shouldStop = false;
+        const code = spriteData.code;
+        try {
+          runCodeWithFunctions({
+            code,
+            thisRun,
+            currentRunId,
+            projectStartedTime,
+            spriteData,
+            app,
+            flagEvents,
+            mouseButtonsPressed,
+            keysPressed,
+            playingSounds,
+            runningScripts,
+            promiseWithAbort,
+            signal
+          });
+        } catch (e) {
+          console.error(\`Error processing code for sprite \${spriteData.id}:\`, e);
+        }
+      });
+      const eventsForThisRun = flagEvents.filter((e) => e.runId === thisRun);
+      for (const e of eventsForThisRun) {
+        const idx = flagEvents.indexOf(e);
+        if (idx !== -1) flagEvents.splice(idx, 1);
+      }
+      Promise.allSettled(
+        eventsForThisRun.map((entry) => promiseWithAbort(entry.cb, signal))
+      ).then((results) => {
+        results.forEach((res) => {
+          if (res.status === "rejected") {
+            const e = res.reason;
+            if (e?.message === "shouldStop") return;
+            console.error(\`Error running flag event:\`, e);
+          }
+        });
+      });
+    }
+    document.getElementById("run-button").addEventListener("click", runCode);
+    document.getElementById("stop-button").addEventListener("click", stopAllScripts);
+  })();`;
+  const minifiedScript = await minifyScript(scriptContent);
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rarry Export</title>
+  <style>
+    :root {
+      --dark: #e2e8f0;
+      --dark-light: #c8cdd4;
+      --primary: #3b82f6;
+      --primary-dark: #336ce7;
+      --danger: #f63b3b;
+      --danger-dark: #dd3434;
+      --color1: #262d36;
+      --color2: #2f3741;
+      --color3: #3d4552;
+      --color4: #464f5e;
+    }
+    button {
+      font-family: var(--font);
+      font-size: medium;
+      font-weight: 700;
+      padding: 0.5rem 0.9rem;
+      border-radius: 0.5rem;
+      border: none;
+      background-color: var(--dark);
+      color: var(--color1);
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    button:hover {
+      background-color: var(--dark-light);
+    }
+    #stage-wrapper {
+      position: relative;
+      width: 100%;
+      padding-top: 56.25%;
+    }
+    #stage-div {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      z-index: 9999;           
+      background: var(--color1);
+    }
+    #stage canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    #stage-controls {
+      background-color: var(--color1);
+      padding: 0.5rem;
+      border-bottom: 2px solid var(--color3);
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+    }
+    #stage-controls button {
+      padding: 0.5rem;
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 25%;
+      background-color: var(--color2);
+      transition: background-color 0.2s;
+    }
+    #stage-controls button:hover {
+      background-color: var(--color3);
+    }
+    #stage-controls button img {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+  <script>
+    ${pixiMinJs}
+  </script>
+</head>
+<body>
+  <div id="stage-div">
+    <div id="stage-controls">
+      <button id="run-button">
+        <img src="${await fetchSvgDataURL("icons/flag.svg")}">
+      </button>
+      <button id="stop-button">
+        <img src="${await fetchSvgDataURL("icons/stop.svg")}">
+      </button>
+    </div>
+    <div id="stage-wrapper">
+        <div id="stage"></div>
+    </div>
+  </div>
+
+  <script>
+    ${minifiedScript}
+  </script>
+</body>
+</html>`;
+  return html;
+}
+
+async function downloadStandaloneHTML(filename = "rarryProject") {
+  try {
+    const html = await generateStandaloneHTML();
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename + ".html";
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("Export failed:", err);
+    alert("Export failed (see console).");
+  }
+}
+
+document
+  .getElementById("export-button")
+  .addEventListener("click", () => downloadStandaloneHTML());

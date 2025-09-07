@@ -69,7 +69,7 @@ header {
 }
 
 header h2,
-header button:not(#theme-toggle, .white) {
+header button:not(.white) {
   color: #f3f4f6;
 }
 
@@ -149,6 +149,10 @@ button.green:hover {
   background-color: #28b85c;
 }
 
+.dark header button:not(.primary,.danger, .orange, .green) {
+  color: var(--color1);
+}
+
 #blocklyDiv {
   height: 100%;
   width: 100%;
@@ -183,7 +187,7 @@ button.tab-button {
 }
 
 button.tab-button.inactive {
-  background-color: transparent;
+  background-color: var(--color1);
   color: var(--dark);
 }
 
@@ -433,6 +437,10 @@ button.tab-button.inactive {
 
 .dark .blocklyToolboxCategory.blocklyToolboxSelected {
   background-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.draggingBlocklyToolboxCategory .blocklyToolboxCategory {
+  background: none !important;
 }
 
 .blocklyToolboxCategoryLabel {

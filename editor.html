@@ -31,6 +31,7 @@
             <button id="save-button" class="green">Save</button>
             <button id="load-button" class="orange">Load</button>
             <input type="file" id="load-input" class="hidden" accept=".rarry" />
+            <button id="export-button">Export</button>
         </div>
     </header>
 
@@ -141,7 +142,6 @@
                     </shadow>
                 </value>
             </block>
-            <sep gap="50"></sep>
             <block type="get_position"></block>
             <sep gap="50"></sep>
             <block type="angle_turn">
@@ -158,6 +158,7 @@
                     </shadow>
                 </value>
             </block>
+            <block type="get_angle"></block>
         </category>
 
         <category name="Looks" colour="#9966FF">
