@@ -4,7 +4,8 @@ export default {
       input: {
         main: "index.html",
         editor: "editor.html",
-      }
+      },
+      treeshake: false, 
     },
   },
 };
