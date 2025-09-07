@@ -1231,20 +1231,6 @@ Sortable.create(document.querySelector("div.blocklyToolboxCategoryGroup"), {
   },
 });
 
-import { minify } from "terser";
-async function minifyScript(code) {
-  const result = await minify(code, {
-    compress: true,
-    mangle: false,
-    format: {
-      comments: false,
-      beautify: false,
-      inline_script: true
-    },
-  });
-  return result.code;
-}
-
 async function generateStandaloneHTML() {
   async function fetchSvgDataURL(path) {
     const svgText = await (await fetch(path)).text();
@@ -1485,7 +1471,6 @@ async function generateStandaloneHTML() {
     document.getElementById("run-button").addEventListener("click", runCode);
     document.getElementById("stop-button").addEventListener("click", stopAllScripts);
   })();`;
-  const minifiedScript = await minifyScript(scriptContent);
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1590,10 +1575,10 @@ async function generateStandaloneHTML() {
   </div>
 
   <script>
-    ${minifiedScript}
+    ${scriptContent}
   </script>
 </body>
-</html>`.replaceAll("runningScripts$1", "runningScripts");
+</html>`;
   return html;
 }
 
