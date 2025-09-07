@@ -1239,7 +1239,7 @@ async function minifyScript(code) {
     format: {
       comments: false,
       beautify: false,
-      semicolons: true,
+      inline_script: true
     },
   });
   return result.code;
@@ -1593,7 +1593,7 @@ async function generateStandaloneHTML() {
     ${minifiedScript}
   </script>
 </body>
-</html>`;
+</html>`.replaceAll("runningScripts$1", "runningScripts");
   return html;
 }
 
