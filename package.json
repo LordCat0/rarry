@@ -16,6 +16,7 @@
     "blockly": "^12.2.0",
     "pako": "^2.1.0",
     "pixi.js": "^5.3.3",
-    "sortablejs": "^1.15.6"
+    "sortablejs": "^1.15.6",
+    "terser": "^5.44.0"
   }
 }
