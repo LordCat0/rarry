@@ -5,8 +5,8 @@ Blockly.Blocks["move_steps"] = {
   init: function () {
     this.appendValueInput("STEPS").setCheck("Number").appendField("move");
     this.appendDummyInput().appendField("steps");
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#4C97FF");
   },
 };
@@ -24,8 +24,8 @@ Blockly.Blocks["change_position"] = {
         "MENU"
       )
       .appendField("by");
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#4C97FF");
   },
 };
@@ -43,8 +43,8 @@ Blockly.Blocks["set_position"] = {
         "MENU"
       )
       .appendField("to");
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#4C97FF");
   },
 };
@@ -54,8 +54,8 @@ Blockly.Blocks["goto_position"] = {
     this.appendValueInput("x").setCheck("Number").appendField("go to x:");
     this.appendValueInput("y").setCheck("Number").appendField("y:");
     this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#4C97FF");
   },
 };
@@ -103,8 +103,8 @@ Blockly.Blocks["angle_turn"] = {
         "DIRECTION"
       );
     this.appendDummyInput().appendField("degrees");
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#4C97FF");
   },
 };
@@ -116,8 +116,8 @@ Blockly.Blocks["angle_set"] = {
       .appendField("set angle to");
     this.appendDummyInput().appendField("degrees");
     this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#4C97FF");
   },
 };

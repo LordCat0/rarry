@@ -4,8 +4,8 @@ import * as BlocklyJS from "blockly/javascript";
 Blockly.Blocks["say_message"] = {
   init: function () {
     this.appendValueInput("MESSAGE").setCheck(null).appendField("say");
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setInputsInline(true);
     this.setColour("#9966FF");
   },
@@ -16,8 +16,8 @@ Blockly.Blocks["say_message_duration"] = {
     this.appendValueInput("MESSAGE").setCheck(null).appendField("say");
     this.appendValueInput("DURATION").setCheck("Number").appendField("for");
     this.appendDummyInput().appendField("seconds");
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setInputsInline(true);
     this.setColour("#9966FF");
   },

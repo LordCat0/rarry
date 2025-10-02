@@ -46,6 +46,20 @@ Blockly.Blocks["text"] = {
   },
 };
 
+Object.keys(Blockly.Blocks).forEach((type) => {
+  const block = Blockly.Blocks[type];
+  if (!block || typeof block.init !== "function") return;
+
+  const originalInit = block.init;
+  block.init = function () {
+    originalInit.call(this);
+    if (this.previousConnection && this.previousConnection.check_ === null)
+      this.setPreviousStatement(true, "default");
+    if (this.nextConnection && this.nextConnection.check_ === null)
+      this.setNextStatement(true, "default");
+  };
+});
+
 BlocklyJS.javascriptGenerator.forBlock["procedures_defnoreturn"] = function (
   block,
   generator

@@ -34,8 +34,8 @@ Blockly.Blocks["json_set"] = {
     this.appendValueInput("OBJECT").setCheck("Object").appendField("in object");
     this.appendValueInput("KEY").setCheck("String").appendField("set");
     this.appendValueInput("VALUE").appendField("to");
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setInputsInline(true);
     this.setStyle("json_category");
     this.setTooltip("Sets a value to a key in a JSON object.");

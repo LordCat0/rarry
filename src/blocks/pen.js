@@ -4,8 +4,8 @@ import * as BlocklyJS from "blockly/javascript";
 Blockly.Blocks["pen_down"] = {
   init: function () {
     this.appendDummyInput().appendField("pen down");
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#0fbd8c");
     this.setTooltip("Put the pen down to draw");
   },
@@ -17,8 +17,8 @@ BlocklyJS.javascriptGenerator.forBlock["pen_down"] = function () {
 Blockly.Blocks["pen_up"] = {
   init: function () {
     this.appendDummyInput().appendField("pen up");
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#0fbd8c");
     this.setTooltip("Lift the pen up");
   },
@@ -34,8 +34,8 @@ Blockly.Blocks["set_pen_color"] = {
     this.appendValueInput("G").setCheck("Number").appendField("G");
     this.appendValueInput("B").setCheck("Number").appendField("B");
     this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#0fbd8c");
     this.setTooltip("Set the pen color to a RGB value");
   },
@@ -75,8 +75,8 @@ Blockly.Blocks["set_pen_color_combined"] = {
       );
     this.appendValueInput("VALUE").setCheck(["String", "Number"]);
     this.setInputsInline(true);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#0fbd8c");
     this.setTooltip("Set the pen color to a RGB or HEX value.");
   },
@@ -106,8 +106,8 @@ Blockly.Blocks["set_pen_size"] = {
       .setCheck("Number")
       .appendField("set pen size to");
     this.appendDummyInput().appendField("px");
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#0fbd8c");
     this.setTooltip("Set the pen thickness to a specific value in pixels");
   },
@@ -125,8 +125,8 @@ BlocklyJS.javascriptGenerator.forBlock["set_pen_size"] = function (block) {
 Blockly.Blocks["clear_pen"] = {
   init: function () {
     this.appendDummyInput().appendField("clear pen");
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#0fbd8c");
     this.setTooltip("Clear all pen drawings");
   },

@@ -817,14 +817,14 @@ function saveProject() {
   URL.revokeObjectURL(url);
 }
 
-function loadProject(e) {
+async function loadProject(e) {
   const file = e.target.files[0];
   if (!file) return;
 
   stopAllScripts();
 
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     const buffer = reader.result;
 
     let data;
@@ -855,9 +855,21 @@ function loadProject(e) {
     }
 
     try {
-      data?.extensions?.forEach((extId) => {
-        if (typeof extId === "string") addExtension(extId);
-      });
+      if (data?.extensions) {
+        const extensionsToLoad = data.extensions.filter(
+          (i) => !activeExtensions.some((z) => (z?.id || z) === (i?.id || i))
+        );
+
+        for (const ext of extensionsToLoad) {
+          console.log(ext);
+          if (typeof ext === "string") {
+            addExtension(ext);
+          } else if (ext?.id) {
+            const ExtensionClass = await eval("(" + ext.code + ")");
+            await registerExtension(ExtensionClass);
+          }
+        }
+      }
 
       app.stage.removeChildren().forEach((child) => {
         if (child.destroy) child.destroy();
@@ -869,7 +881,9 @@ function loadProject(e) {
         return;
       }
 
-      data.sprites.forEach((entry, i) => {
+      if (data.variables) window.projectVariables = data.variables;
+
+      data?.sprites?.forEach((entry, i) => {
         if (!entry || typeof entry !== "object") return;
 
         const spriteData = {
@@ -937,8 +951,6 @@ function loadProject(e) {
         app.stage.addChild(sprite);
         sprites.push(spriteData);
       });
-
-      if (data.variables) window.projectVariables = data.variables;
 
       setActiveSprite(sprites[0] || null);
     } catch (err) {
@@ -1742,6 +1754,7 @@ document
           {
             type: "textarea",
             placeholder: "class Extension { ... }",
+            className: "extension-code-input",
           },
         ],
         [
@@ -1751,27 +1764,68 @@ document
             className: "primary",
             onClick: (popup) => {
               const input = popup.querySelector('[data-row="1"][data-col="1"]');
-              const value = input ? input.value : "";
+              const userCode = input ? input.value : "";
 
-              try {
-                const sandbox = new Function(
-                  "registerExtension",
-                  `"use strict";\n${value}`
-                );
+              const iframe = document.createElement("iframe");
+              iframe.style.display = "none";
+              iframe.sandbox = "allow-scripts";
+              iframe.srcdoc = `
+                <script>
+                  "use strict";
+                  const registerExtension = (def) => {
+                    parent.postMessage({ type: "registerExtension", code: def.toString() }, "*");
+                  };
+                  window.addEventListener("message", (event) => {
+                    if (event.data && event.data.type === "runCode") {
+                      try {
+                        eval(event.data.code);
+                      } catch (err) {
+                        parent.postMessage({ type: "error", error: err.message }, "*");
+                      }
+                    }
+                  });
+                  parent.postMessage({ type: "iframeReady" }, "*");
+                </script>
+              `;
+              document.body.appendChild(iframe);
 
-                sandbox(function registerExtension(def) {
-                  console.log("Extension registered:", def);
-                });
-              } catch (err) {
-                console.error("Error in extension code:", err);
-              }
+              const handleMessage = (event) => {
+                if (!event.data) return;
 
-              setTimeout(() => {
-                document
-                  .getElementById("extensions-popup")
-                  ?.classList.add("hidden");
-                popup.remove();
-              });
+                switch (event.data.type) {
+                  case "registerExtension":
+                    try {
+                      const ExtensionClass = eval("(" + event.data.code + ")");
+                      registerExtension(ExtensionClass);
+
+                      console.log("Extension registered:", ExtensionClass);
+                    } catch (error) {
+                      console.error("Error in extension:", error);
+                      window.alert("Error in extension: " + error);
+                    }
+
+                    iframe.remove();
+                    window.removeEventListener("message", handleMessage);
+                    break;
+                  case "error":
+                    console.error("Error in extension:", event.data.error);
+                    window.alert("Error in extension: " + event.data.error);
+                    break;
+                  case "iframeReady":
+                    iframe.contentWindow.postMessage(
+                      { type: "runCode", code: userCode },
+                      "*"
+                    );
+                    break;
+                }
+              };
+
+              window.addEventListener("message", handleMessage);
+
+              popup.remove();
+              document
+                .getElementById("extensions-popup")
+                ?.classList.add("hidden");
             },
           },
         ],

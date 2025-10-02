@@ -2,6 +2,7 @@ import * as Blockly from "blockly";
 import * as BlocklyJS from "blockly/javascript";
 import { activeExtensions } from "./editor";
 import { Thread } from "./threads";
+import { minify } from "terser";
 
 function textToBlock(block, text, fields) {
   const regex = /\[([^\]]+)\]/g;
@@ -15,12 +16,23 @@ function textToBlock(block, text, fields) {
     }
 
     const inputName = match[1].trim();
-    const validTypes = ["String", "Number", "Boolean", "Array", "Object", null];
+    const spec = fields?.[inputName];
 
-    const inputType = fields?.[inputName]?.type;
-    const checkType = validTypes.includes(inputType) ? inputType : null;
-
-    block.appendValueInput(inputName).setCheck(checkType);
+    if (spec?.kind === "statement") {
+      block
+        .appendStatementInput(inputName)
+        .setCheck(spec?.accepts || "default");
+    } else if (spec?.kind === "value") {
+      block.appendValueInput(inputName).setCheck(spec?.type);
+    } else if (spec?.kind === "menu") {
+      const menuItems = spec.items.map((item) =>
+        typeof item === "string" ? [item, item] : [item.text, item.value]
+      );
+      const field = new Blockly.FieldDropdown(menuItems);
+      block.appendDummyInput().appendField(field, inputName);
+    } else {
+      block.appendDummyInput().appendField("[" + inputName + "]");
+    }
 
     lastIndex = regex.lastIndex;
   }
@@ -31,11 +43,53 @@ function textToBlock(block, text, fields) {
   }
 }
 
-export function registerExtension(extClass) {
+if (!window.extensions) {
+  const backing = {};
+
+  const proxy = new Proxy(backing, {
+    defineProperty(target, prop, descriptor) {
+      if (prop in target)
+        throw new Error(`Extension "${prop}" already defined`);
+      return Reflect.defineProperty(target, prop, {
+        ...descriptor,
+        writable: false,
+        configurable: false,
+      });
+    },
+    set(target, prop, value) {
+      if (prop in target)
+        throw new Error(`Extension "${prop}" is already defined and locked`);
+      return Reflect.defineProperty(target, prop, {
+        value,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    },
+    deleteProperty() {
+      throw new Error("Extensions cannot be removed");
+    },
+    get(target, prop, receiver) {
+      return Reflect.get(target, prop, receiver);
+    },
+    ownKeys(target) {
+      return Reflect.ownKeys(target);
+    },
+  });
+
+  Object.defineProperty(window, "extensions", {
+    value: proxy,
+    writable: false,
+    configurable: false,
+    enumerable: true,
+  });
+}
+
+export async function registerExtension(extClass) {
   const ext = new extClass();
   const id = ext.id || ext.constructor.name;
 
-  if (activeExtensions.includes(id)) {
+  if (activeExtensions.some((i) => (i?.id || i) === id)) {
     console.warn(`Extension ${id} already registered`);
     return;
   }
@@ -53,6 +107,7 @@ export function registerExtension(extClass) {
   }
 
   const blocks = ext.registerBlocks?.() || [];
+  const blockDefs = {};
   blocks.forEach((blockDef) => {
     if (!blockDef.id) {
       console.warn("Skipped registration of block with no ID");
@@ -60,16 +115,19 @@ export function registerExtension(extClass) {
     }
 
     const blockType = `${id}_${blockDef.id}`;
-
+    blockDefs[blockType] = blockDef;
     Blockly.Blocks[blockType] = {
       init: function () {
         textToBlock(this, blockDef.text, blockDef.fields);
 
         if (blockDef.type === "statement") {
-          this.setPreviousStatement(true, null);
-          this.setNextStatement(true, null);
+          this.setPreviousStatement(true, blockDef.statementType || "default");
+          this.setNextStatement(true, blockDef.statementType || "default");
+        } else if (blockDef.type === "cap") {
+          this.setPreviousStatement(true, blockDef.statementType || "default");
         } else if (blockDef.type === "output") {
-          this.setOutput(true, null);
+          this.setOutput(true, blockDef.outputType);
+          if (blockDef.outputShape) this.setOutputShape(blockDef.outputShape);
         }
         if (blockDef.tooltip) this.setTooltip(blockDef.tooltip);
         this.setInputsInline(true);
@@ -82,22 +140,44 @@ export function registerExtension(extClass) {
       blockEl.setAttribute("type", blockType);
 
       for (const [name, spec] of Object.entries(blockDef.fields || {})) {
-        if (spec.default !== undefined) {
+        if (spec?.kind === "menu") continue;
+
+        if (spec.default !== undefined && spec?.kind !== "statement") {
           const valueEl = document.createElement("value");
           valueEl.setAttribute("name", name.trim());
 
-          const shadowEl = document.createElement("shadow");
-          shadowEl.setAttribute(
-            "type",
-            spec.type === "Number" ? "math_number" : "text"
-          );
+          let shadowEl = null;
 
-          const fieldEl = document.createElement("field");
-          fieldEl.setAttribute("name", spec.type === "Number" ? "NUM" : "TEXT");
-          fieldEl.textContent = spec.default;
+          if (spec.type === "Number") {
+            shadowEl = document.createElement("shadow");
+            shadowEl.setAttribute("type", "math_number");
 
-          shadowEl.appendChild(fieldEl);
-          valueEl.appendChild(shadowEl);
+            const fieldEl = document.createElement("field");
+            fieldEl.setAttribute("name", "NUM");
+            fieldEl.textContent = spec.default;
+            shadowEl.appendChild(fieldEl);
+          } else if (spec.type === "String") {
+            shadowEl = document.createElement("shadow");
+            shadowEl.setAttribute("type", "text");
+
+            const fieldEl = document.createElement("field");
+            fieldEl.setAttribute("name", "TEXT");
+            fieldEl.textContent = spec.default;
+            shadowEl.appendChild(fieldEl);
+          } else if (spec.type === "Boolean") {
+            shadowEl = document.createElement("shadow");
+            shadowEl.setAttribute("type", "logic_boolean");
+
+            const fieldEl = document.createElement("field");
+            fieldEl.setAttribute("name", "BOOL");
+            fieldEl.textContent = spec.default ? "TRUE" : "FALSE";
+            shadowEl.appendChild(fieldEl);
+          }
+
+          if (shadowEl) {
+            valueEl.appendChild(shadowEl);
+          }
+
           blockEl.appendChild(valueEl);
         }
       }
@@ -112,36 +192,52 @@ export function registerExtension(extClass) {
   }
 
   const codeGen = ext.registerCode?.() || {};
-  window.extensions = window.extensions || [];
-  window.extensions[id] = {};
-
   Object.entries(codeGen).forEach(([blockType, fn]) => {
     const fullType = `${id}_${blockType}`;
 
     window.extensions[fullType] = fn;
+    const def = blockDefs[fullType] || {};
     BlocklyJS.javascriptGenerator.forBlock[fullType] = function (block) {
       const inputs = {};
+
       for (const input of block.inputList) {
         const name = input.name;
-        const codeExpr =
-          BlocklyJS.javascriptGenerator.valueToCode(
-            block,
-            name,
-            BlocklyJS.Order.ATOMIC
-          ) || "null";
-        inputs[name] = codeExpr;
+        let codeExpr;
+
+        if (input.type === 1 || input.type === 2) {
+          codeExpr =
+            BlocklyJS.javascriptGenerator.valueToCode(
+              block,
+              name,
+              BlocklyJS.Order.ATOMIC
+            ) || undefined;
+          if (codeExpr !== undefined) inputs[name] = codeExpr;
+        } else if (input.type === 3) {
+          codeExpr =
+            BlocklyJS.javascriptGenerator.statementToCode(block, name) ||
+            undefined;
+          if (codeExpr !== undefined)
+            inputs[name] = `async () => { ${codeExpr} }`;
+        }
+      }
+
+      for (const [name, spec] of Object.entries(def.fields || {})) {
+        if (spec.kind === "menu") {
+          const fieldVal = block.getFieldValue(name);
+          if (fieldVal !== undefined) inputs[name] = JSON.stringify(fieldVal);
+        }
       }
 
       const argsParts = Object.entries(inputs).map(
-        ([k, v]) => `${JSON.stringify(k)}: ${v}`
+        ([k, v]) => `${JSON.stringify(k)}:${v}`
       );
-      const args = `{ ${argsParts.join(", ")} }`;
-      const callCode = `extensions["${fullType}"](${args}, Thread.getCurrentContext())`;
+      const args = `{${argsParts.join(",")}}`;
+      const callCode = `extensions["${fullType}"](${args},Thread)`;
 
       if (block.outputConnection) return [callCode, BlocklyJS.Order.NONE];
       else return callCode + ";\n";
     };
   });
 
-  activeExtensions.push(id);
+  activeExtensions.push({ id, code: (await minify(extClass.toString())).code });
 }

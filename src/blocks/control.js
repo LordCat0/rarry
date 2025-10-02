@@ -4,8 +4,8 @@ import * as BlocklyJS from "blockly/javascript";
 Blockly.Blocks["wait_one_frame"] = {
   init: function () {
     this.appendDummyInput().appendField("wait one frame");
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#FFAB19");
   },
 };
@@ -20,8 +20,8 @@ Blockly.Blocks["wait_block"] = {
       ]),
       "MENU"
     );
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#FFAB19");
   },
 };
@@ -43,10 +43,10 @@ BlocklyJS.javascriptGenerator.forBlock["wait_block"] = function (
 Blockly.Blocks["controls_thread_create"] = {
   init: function () {
     this.appendDummyInput().appendField("create thread");
-    this.appendStatementInput("code").setCheck(null);
+    this.appendStatementInput("code").setCheck("default");
     this.setTooltip("Create and run the code specified in a new thread");
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setColour("#FFAB19");
   },
 };
@@ -82,8 +82,8 @@ Blockly.Blocks["controls_thread_set_var"] = {
     this.appendValueInput("THREAD")
       .setCheck("ThreadID")
       .appendField("in thread");
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
+    this.setPreviousStatement(true, "default");
+    this.setNextStatement(true, "default");
     this.setInputsInline(true);
     this.setColour("#FFAB19");
     this.setTooltip("Set a variable inside the given thread");

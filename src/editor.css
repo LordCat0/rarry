@@ -51,7 +51,8 @@ div#app {
   flex-direction: column;
 }
 
-div#app, div#stage {
+div#app,
+div#stage {
   overflow: hidden;
 }
 
@@ -90,7 +91,8 @@ header div {
   display: none !important;
 }
 
-button, input[type="file"] {
+button,
+input[type="file"] {
   font-family: var(--font);
   font-size: medium;
   font-weight: 700;
@@ -103,7 +105,8 @@ button, input[type="file"] {
   transition: background-color 0.2s, scale 0.2s;
 }
 
-input[type="text"], textarea {
+input[type="text"],
+textarea {
   font-family: var(--font);
   font-size: medium;
   padding: 0.5rem;
@@ -276,7 +279,7 @@ button.tab-button.inactive {
   height: 100vh;
   margin: 0;
   padding: 0;
-  z-index: 9999;           
+  z-index: 9999;
   background: var(--color1);
 }
 
@@ -456,6 +459,7 @@ html.dark #fullscreen-button img {
 
 .blocklyToolboxCategoryGroup {
   height: 100%;
+  padding-left: 3px;
 }
 
 html.dark .blocklyToolboxCategoryIcon {
@@ -521,7 +525,7 @@ html.dark .blocklyToolboxCategory.blocklyToolboxSelected {
   display: flex;
   justify-content: center;
   align-items: center;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   z-index: 9999;
 }
 
@@ -543,6 +547,11 @@ html.dark .blocklyToolboxCategory.blocklyToolboxSelected {
   border-top-right-radius: 0.5rem;
   width: 100%;
   height: fit-content;
+}
+
+.popup-body textarea.extension-code-input {
+  resize: vertical;
+  width: 100%;
 }
 
 .popup-body,
@@ -568,7 +577,7 @@ html.dark .blocklyToolboxCategory.blocklyToolboxSelected {
 }
 
 input[type="checkbox"] {
-  appearance: none; 
+  appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
   background-color: var(--color3);
@@ -581,7 +590,7 @@ input[type="checkbox"] {
 }
 
 input[type="checkbox"]:checked {
-  background-color: var(--primary); 
+  background-color: var(--primary);
   position: relative;
 }
 

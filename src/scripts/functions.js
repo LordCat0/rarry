@@ -459,8 +459,6 @@ export function runCodeWithFunctions({
     penGraphics.clear();
   }
 
-  console.log(code);
-
   eval(code);
 }
 

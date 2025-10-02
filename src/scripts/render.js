@@ -123,17 +123,18 @@ class CustomConstantProvider extends Blockly.zelos.ConstantProvider {
    * @param {Blockly.RenderedConnection} connection
    */
   shapeFor(connection) {
-    let checks = connection.getCheck();
+    let checks = connection.getCheck() ?? [];
     if (!checks && connection.targetConnection)
-      checks = connection.targetConnection.getCheck();
+      checks = connection.targetConnection.getCheck() ?? [];
+    let outputShape = connection.sourceBlock_.getOutputShape();
 
-    if (checks && (connection.type === 1 || connection.type === 2)) {
+    if (connection.type === 1 || connection.type === 2) {
       if (
-        checks.includes("Array") &&
+        (checks.includes("Array") || outputShape === 4) &&
         !["text_length", "text_isEmpty"].includes(connection.sourceBlock_.type)
       ) {
         return this.BOWL;
-      } else if (checks.includes("Object")) {
+      } else if (checks.includes("Object") || outputShape === 5) {
         return this.PILLOW;
       }
     }
