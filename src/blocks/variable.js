@@ -72,7 +72,7 @@ BlocklyJS.javascriptGenerator.forBlock["set_global_var"] = function (block) {
   return `projectVariables["${name}"] = ${value};\n`;
 };
 
-BlocklyJS.javascriptGenerator.forBlock["chabge_global_var"] = function (block) {
+BlocklyJS.javascriptGenerator.forBlock["change_global_var"] = function (block) {
   const name = block.getFieldValue("VAR");
   const value =
     BlocklyJS.javascriptGenerator.valueToCode(
