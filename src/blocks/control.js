@@ -37,7 +37,7 @@ BlocklyJS.javascriptGenerator.forBlock["wait_block"] = function (
   const duration =
     generator.valueToCode(block, "AMOUNT", BlocklyJS.Order.ATOMIC) || 0;
   const menu = block.getFieldValue("MENU") || 0;
-  return `await wait(${duration * Number(menu)});\n`;
+  return `await wait(${duration} * ${+menu});\n`;
 };
 
 Blockly.Blocks["controls_thread_create"] = {
@@ -136,7 +136,6 @@ Blockly.Blocks["controls_thread_has_var"] = {
     this.appendValueInput("THREAD")
       .setCheck("ThreadID")
       .appendField("exists in thread");
-    this.appendDummyInput().appendField("?");
     this.setInputsInline(true);
     this.setOutput(true, null);
     this.setStyle("control_blocks");
@@ -156,7 +155,7 @@ BlocklyJS.javascriptGenerator.forBlock["controls_thread_has_var"] = function (
   return [code, BlocklyJS.Order.FUNCTION_CALL];
 };
 
-Blockly.Blocks['controls_run_instantly'] = {
+Blockly.Blocks["controls_run_instantly"] = {
   init: function () {
     this.appendDummyInput().appendField("run instantly");
     this.appendStatementInput("do");
@@ -164,17 +163,14 @@ Blockly.Blocks['controls_run_instantly'] = {
     this.setNextStatement(true);
     this.setStyle("control_blocks");
     this.setTooltip("Run inside code without frame delay");
-  }
+  },
 };
 
-BlocklyJS.javascriptGenerator.forBlock['controls_run_instantly'] = function (block) {
-  const branch = BlocklyJS.javascriptGenerator.statementToCode(block, 'do');
-  return `
-  {
-    let _prevFast = fastExecution;
-    fastExecution = true;
-    ${branch}
-    fastExecution = _prevFast;
-  }
-  `;
+BlocklyJS.javascriptGenerator.forBlock["controls_run_instantly"] = function (
+  block
+) {
+  const branch = BlocklyJS.javascriptGenerator.statementToCode(block, "do");
+  return `let _prevFast = fastExecution;
+fastExecution = true;
+${branch}fastExecution = _prevFast;\n`;
 };

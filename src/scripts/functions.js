@@ -44,8 +44,6 @@ export function runCodeWithFunctions({
     );
   }
 
-  code = '"use strict";\n' + code;
-
   function whenFlagClicked(callback) {
     if (stopped()) return;
 
@@ -90,14 +88,9 @@ export function runCodeWithFunctions({
 
   function setPosition(menu, x, y) {
     if (stopped()) return;
-
-    if (menu === "x") {
-      sprite.x = +x;
-    } else if (menu === "y") {
-      sprite.y = -+y;
-    } else if (menu === "xy") {
-      sprite.setPosition({ x: +x, y: -+y });
-    }
+    if (menu === "x") sprite.x = +x;
+    else if (menu === "y") sprite.y = -+y;
+    else if (menu === "xy") sprite.setPosition(+x, -+y);
   }
 
   function getPosition(menu) {
@@ -118,7 +111,7 @@ export function runCodeWithFunctions({
   function sayMessage(message, seconds) {
     if (stopped()) return;
 
-    message = String(message || "");
+    message = String(message ?? "");
     if (!message) return;
 
     if (!spriteData.currentBubble) {
@@ -130,14 +123,17 @@ export function runCodeWithFunctions({
       const container = new PIXI.Container();
       container.addChild(bubble);
       container.addChild(text);
+      container.bubble = bubble;
+      container.text = text;
 
-      spriteData.currentBubble = { container, bubble, text };
+      spriteData.currentBubble = container;
       stage.addChild(container);
     }
 
-    const { container, bubble, text } = spriteData.currentBubble;
+    const container = spriteData.currentBubble;
+    const { bubble, text } = container;
 
-    if (spriteData.sayTimeout != null) {
+    if (spriteData.sayTimeout !== null) {
       clearTimeout(spriteData.sayTimeout);
       spriteData.sayTimeout = null;
     }
@@ -439,6 +435,16 @@ export function runCodeWithFunctions({
 
   function clearPen() {
     penGraphics.clear();
+  }
+
+  function hideSprite() {
+    sprite.visible = false;
+    if (spriteData.currentBubble) spriteData.currentBubble.visible = false;
+  }
+
+  function showSprite() {
+    sprite.visible = true;
+    if (spriteData.currentBubble) spriteData.currentBubble.visible = true;
   }
 
   eval(code);

@@ -272,19 +272,13 @@ Object.defineProperty(PIXI.Sprite.prototype, "y", {
   },
 });
 
-PIXI.Sprite.prototype.setPosition = function({ x = null, y = null, add = false, silent = false } = {}) {
+PIXI.Sprite.prototype.setPosition = function (x = null, y = null, add = false) {
   const newX = x !== null ? (add ? this.x + x : x) : this.x;
   const newY = y !== null ? (add ? this.y + y : y) : this.y;
-
-  if (silent) {
-    originalX.set.call(this, newX);
-    originalY.set.call(this, newY);
-  } else {
-    const changed = (this.x !== newX) || (this.y !== newY);
-    originalX.set.call(this, newX);
-    originalY.set.call(this, newY);
-    if (changed) SpriteChangeEvents.emit("positionChanged", this);
-  }
+  if (this.x === newX && this.y === newY) return;
+  originalX.set.call(this, newX);
+  originalY.set.call(this, newY);
+  SpriteChangeEvents.emit("positionChanged", this);
 };
 
 Object.defineProperty(PIXI.Sprite.prototype, "angle", {

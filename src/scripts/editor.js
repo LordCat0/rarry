@@ -13,12 +13,7 @@ import { Thread } from "./threads.js";
 import.meta.glob("../blocks/**/*.js", { eager: true });
 
 BlocklyJS.javascriptGenerator.addReservedWords(
-  `whenFlagClicked,moveSteps,changePosition,setPosition,getPosition,getAngle,
-  getMousePosition,sayMessage,waitOneFrame,wait,switchCostume,setSize,setAngle,
-  projectTime,isKeyPressed,isMouseButtonPressed,getCostumeSize,getSpriteScale,
-  _startTween,startTween,soundProperties,getSoundProperty,setSoundProperty,
-  playSound,stopSound,stopAllSounds,isMouseTouchingSprite,setPenStatus,
-  setPenColor,setPenColorHex,setPenSize,clearPen`.replaceAll("\n", "")
+  "whenFlagClicked,moveSteps,changePosition,setPosition,getPosition,getAngle,getMousePosition,sayMessage,waitOneFrame,wait,switchCostume,setSize,setAngle,projectTime,isKeyPressed,isMouseButtonPressed,getCostumeSize,getSpriteScale,_startTween,startTween,soundProperties,getSoundProperty,setSoundProperty,playSound,stopSound,stopAllSounds,isMouseTouchingSprite,setPenStatus,setPenColor,setPenColorHex,setPenSize,clearPen,Thread,fastExecution,BUBBLE_TEXTSTYLE,sprite,renderer,stage,costumeMap,soundMap,stopped,code,penGraphics,runningScripts,findOrFilterItem"
 );
 
 const wrapper = document.getElementById("stage-wrapper");
@@ -112,6 +107,9 @@ const blockStyles = {
   },
   json_category: {
     colourPrimary: "#FF8349",
+  },
+  set_blocks: {
+    colourPrimary: "#2CC2A9",
   },
 };
 
@@ -217,8 +215,8 @@ workspace.registerToolboxCategoryCallback("GLOBAL_VARIABLES", function (ws) {
   return xmlList;
 });
 
-workspace.registerButtonCallback("ADD_GLOBAL_VARIABLE", (button) => {
-  const name = prompt("New variable name:");
+export function addGlobalVariable(name = "") {
+  if (!name || name === "") name = prompt("New variable name:");
   if (name) {
     let newName = name,
       count = 0;
@@ -229,7 +227,9 @@ workspace.registerButtonCallback("ADD_GLOBAL_VARIABLE", (button) => {
 
     window.projectVariables[newName] = 0;
   }
-});
+}
+
+workspace.registerButtonCallback("ADD_GLOBAL_VARIABLE", () => addGlobalVariable());
 
 export function addSprite() {
   const texture = PIXI.Texture.from("./icons/ddededodediamante.png", {
@@ -258,10 +258,16 @@ export function setActiveSprite(spriteData) {
   renderSpritesList(true);
   workspace.clear();
 
-  if (spriteData == null) {
+  const workspaceContainer = workspace.getParentSvg().parentNode;
+
+  if (!spriteData) {
     deleteSpriteButton.disabled = true;
+    workspaceContainer.style.display = "none";
     return;
-  } else deleteSpriteButton.disabled = false;
+  } else {
+    deleteSpriteButton.disabled = false;
+    workspaceContainer.style.display = "";
+  }
 
   const xmlText =
     activeSprite.code ||
@@ -600,13 +606,12 @@ function stopAllScripts() {
   );
 
   sprites.forEach((spriteData) => {
-    if (spriteData.currentBubble) {
-      try {
-        app.stage.removeChild(spriteData.currentBubble);
-      } catch (e) {}
+    let bubble = spriteData.currentBubble;
+    if (bubble) {
+      if (bubble.destroy) bubble.destroy({ children: true });
       spriteData.currentBubble = null;
     }
-    if (spriteData.sayTimeout != null) {
+    if (spriteData.sayTimeout) {
       clearTimeout(spriteData.sayTimeout);
       spriteData.sayTimeout = null;
     }
@@ -804,22 +809,21 @@ async function loadProject(e) {
 
   const reader = new FileReader();
   reader.onload = async () => {
+    e.target.value = "";
+
     const buffer = reader.result;
 
     let data;
-
     try {
-      const text =
-        typeof buffer === "string" ? buffer : new TextDecoder().decode(buffer);
+      const text = new TextDecoder().decode(buffer);
       data = JSON.parse(text);
-    } catch (e1) {
+    } catch {
       try {
-        const compressed = new Uint8Array(buffer);
-        const inflated = pako.inflate(compressed);
+        const inflated = pako.inflate(new Uint8Array(buffer));
         const json = new TextDecoder().decode(inflated);
         data = JSON.parse(json);
-      } catch (e2) {
-        console.error("Failed to parse file", e2);
+      } catch (err) {
+        console.error("Failed to parse file", err);
         return window.alert("Invalid or corrupted project file.");
       }
     }
@@ -840,18 +844,22 @@ async function loadProject(e) {
         );
 
         for (const ext of extensionsToLoad) {
-          if (typeof ext === "string") {
-            addExtension(ext);
-          } else if (ext?.id) {
-            const ExtensionClass = await eval("(" + ext.code + ")");
-            await registerExtension(ExtensionClass);
+          try {
+            if (typeof ext === "string") {
+              addExtension(ext);
+            } else if (ext?.id) {
+              const ExtensionClass = await eval("(" + ext.code + ")");
+              if (ExtensionClass) await registerExtension(ExtensionClass);
+            }
+          } catch (err) {
+            console.error("Failed to load extension", ext?.id || ext, err);
           }
         }
       }
 
-      app.stage.removeChildren().forEach((child) => {
-        if (child.destroy) child.destroy();
-      });
+      for (const child of app.stage.removeChildren()) {
+        if (child.destroy) child.destroy({ children: true });
+      }
       sprites = [];
 
       if (!Array.isArray(data.sprites)) {
@@ -892,7 +900,12 @@ async function loadProject(e) {
               const texture = PIXI.Texture.from(c.data);
               spriteData.costumes.push({ name: c.name, texture });
             } catch (err) {
-              console.warn(`Failed to load costume: ${c.name}`, err);
+              console.warn(
+                `Failed to load costume: ${c.name}, using placeholder`,
+                err
+              );
+              const texture = PIXI.Texture.WHITE;
+              spriteData.costumes.push({ name: c.name, texture });
             }
           });
         }
@@ -1015,9 +1028,21 @@ window.addEventListener("resize", () => {
   resizeCanvas();
 });
 
+function isXmlEmpty(input = "") {
+  return (
+    input === '<xml xmlns="https://developers.google.com/blockly/xml"></xml>' ||
+    input.trim() === ""
+  );
+}
+
 window.addEventListener("beforeunload", (e) => {
-  e.preventDefault();
-  e.returnValue = "";
+  if (
+    sprites.length <= 1 &&
+    sprites.some((sprite) => !isXmlEmpty(sprite.code))
+  ) {
+    e.preventDefault();
+    e.returnValue = "";
+  }
 });
 
 const allowedKeys = new Set([
@@ -1028,8 +1053,7 @@ const allowedKeys = new Set([
   " ",
   "Enter",
   "Escape",
-  ..."abcdefghijklmnopqrstuvwxyz0123456789",
-  ..."abcdefghijklmnopqrstuvwxyz".toUpperCase(),
+  ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
 ]);
 window.addEventListener("keydown", (e) => {
   const key = e.key;
@@ -1057,11 +1081,11 @@ window.addEventListener("mouseup", (e) => {
 });
 
 SpriteChangeEvents.on("scaleChanged", (sprite) => {
-  if (activeSprite.pixiSprite === sprite) renderSpriteInfo();
+  if (activeSprite?.pixiSprite === sprite) renderSpriteInfo();
 });
 
 SpriteChangeEvents.on("positionChanged", (sprite) => {
-  if (activeSprite.pixiSprite === sprite) renderSpriteInfo();
+  if (activeSprite?.pixiSprite === sprite) renderSpriteInfo();
 
   const spriteData = sprites.find((s) => s?.pixiSprite === sprite);
   if (!spriteData) return;
@@ -1146,6 +1170,40 @@ const extensions = [
           <value name="SIZE"><shadow type="math_number"><field name="NUM">1</field></shadow></value>
         </block>
         <block type="clear_pen"></block>
+      </category>`,
+  },
+  {
+    id: "sets",
+    name: "Sets",
+    xml: `<category name="Sets" colour="#2cc2a9">
+        <block type="sets_create_with">
+          <mutation items="2"></mutation>
+        </block>
+        <sep gap="50"></sep>
+        <block type="sets_has">
+          <value name="VALUE">
+              <shadow type="text">
+                  <field name="TEXT"></field>
+              </shadow>
+          </value>
+        </block>
+        <block type="sets_add">
+          <value name="VALUE">
+              <shadow type="text">
+                  <field name="TEXT"></field>
+              </shadow>
+          </value>
+        </block>
+        <block type="sets_delete">
+          <value name="VALUE">
+              <shadow type="text">
+                  <field name="TEXT"></field>
+              </shadow>
+          </value>
+        </block>
+        <block type="sets_size"></block>
+        <block type="sets_convert"></block>
+        <block type="sets_merge"></block>
       </category>`,
   },
 ];

@@ -277,9 +277,8 @@ BlocklyJS.javascriptGenerator.forBlock["json_create"] = function (block) {
 
 Blockly.Blocks["json_has_key"] = {
   init: function () {
-    this.appendValueInput("KEY").setCheck("String").appendField("is");
-    this.appendValueInput("OBJECT").setCheck("Object").appendField("in object");
-    this.appendDummyInput().appendField("?");
+    this.appendValueInput("OBJECT").setCheck("Object").appendField("does object");
+    this.appendValueInput("KEY").setCheck("String").appendField("have");
     this.setOutput(true, "Boolean");
     this.setInputsInline(true);
     this.setStyle("json_category");
