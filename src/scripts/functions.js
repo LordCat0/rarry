@@ -35,6 +35,7 @@ export function runCodeWithFunctions({
     (spriteData.costumes || []).map((c) => [c.name, c])
   );
   const soundMap = new Map((spriteData.sounds || []).map((s) => [s.name, s]));
+  const extensions = window.extensions;
 
   function stopped() {
     return (
