@@ -1,22 +1,28 @@
+import "@fortawesome/fontawesome-free/css/all.min.css";
+
 import * as Blockly from "blockly";
 import * as BlocklyJS from "blockly/javascript";
 import * as PIXI from "pixi.js";
 import pako from "pako";
 import { minify } from "terser";
-import "@fortawesome/fontawesome-free/css/all.min.css";
 
 import CustomRenderer from "./render.js";
+import { toggleTheme, toggleIcons } from "./theme.js";
+import { showPopup } from "./utils.js";
+
 import { SpriteChangeEvents } from "./patches.js";
-import { runCodeWithFunctions, showPopup } from "./functions.js";
 import { registerExtension, setupExtensions } from "./extensionManager.js";
 import { Thread } from "./threads.js";
-import.meta.glob("../blocks/**/*.js", { eager: true });
-
-Thread.resetAll();
+import { runCodeWithFunctions } from "./runCode.js";
 
 BlocklyJS.javascriptGenerator.addReservedWords(
   "whenFlagClicked,moveSteps,changePosition,setPosition,getPosition,getAngle,getMousePosition,sayMessage,waitOneFrame,wait,switchCostume,setSize,setAngle,projectTime,isKeyPressed,isMouseButtonPressed,getCostumeSize,getSpriteScale,_startTween,startTween,soundProperties,getSoundProperty,setSoundProperty,playSound,stopSound,stopAllSounds,isMouseTouchingSprite,setPenStatus,setPenColor,setPenColorHex,setPenSize,clearPen,Thread,fastExecution,BUBBLE_TEXTSTYLE,sprite,renderer,stage,costumeMap,soundMap,stopped,code,penGraphics,runningScripts,findOrFilterItem"
 );
+
+import.meta.glob("../blocks/**/*.js", { eager: true });
+
+const root = document.documentElement;
+Thread.resetAll();
 
 const wrapper = document.getElementById("stage-wrapper");
 const stageContainer = document.getElementById("stage");
@@ -27,7 +33,6 @@ const deleteSpriteButton = document.getElementById("delete-sprite-button");
 const tabButtons = document.querySelectorAll(".tab-button");
 const tabContents = document.querySelectorAll(".tab-content");
 const fullscreenButton = document.getElementById("fullscreen-button");
-const root = document.documentElement;
 
 const BASE_WIDTH = 480;
 const BASE_HEIGHT = 360;
@@ -42,6 +47,8 @@ app.stageWidth = BASE_WIDTH;
 app.stageHeight = BASE_HEIGHT;
 
 export function resizeCanvas() {
+  if (!wrapper) return;
+
   const w = wrapper.clientWidth;
   const h = wrapper.clientHeight;
 
@@ -73,71 +80,6 @@ window.projectVariables = {};
 export let sprites = [];
 export let activeSprite = null;
 
-const blockStyles = {
-  logic_blocks: {
-    colourPrimary: "#59BA57",
-  },
-  math_blocks: {
-    colourPrimary: "#59BA57",
-  },
-  text_blocks: {
-    colourPrimary: "#59BA57",
-  },
-  loop_blocks: {
-    colourPrimary: "#FFAB19",
-  },
-  variable_blocks: {
-    colourPrimary: "#FF8C1A",
-  },
-  list_blocks: {
-    colourPrimary: "#E35340",
-  },
-  procedure_blocks: {
-    colourPrimary: "#FF6680",
-  },
-  motion_blocks: {
-    colourPrimary: "#4C97FF",
-  },
-  looks_blocks: {
-    colourPrimary: "#9966FF",
-  },
-  events_blocks: {
-    colourPrimary: "#FFC400",
-  },
-  control_blocks: {
-    colourPrimary: "#FFAB19",
-  },
-  json_category: {
-    colourPrimary: "#FF8349",
-  },
-  set_blocks: {
-    colourPrimary: "#2CC2A9",
-  },
-};
-
-const lightTheme = Blockly.Theme.defineTheme("customLightTheme", {
-  base: Blockly.Themes.Classic,
-  blockStyles: blockStyles,
-});
-
-const darkTheme = Blockly.Theme.defineTheme("customDarkTheme", {
-  base: Blockly.Themes.Classic,
-  blockStyles: blockStyles,
-  componentStyles: {
-    workspaceBackgroundColour: "#1a1e25",
-    toolboxBackgroundColour: "#303236",
-    toolboxForegroundColour: "#fff",
-    flyoutBackgroundColour: "#212327",
-    flyoutForegroundColour: "#ccc",
-    flyoutOpacity: 1,
-    scrollbarColour: "#797979",
-    insertionMarkerColour: "#fff",
-    insertionMarkerOpacity: 0.3,
-    scrollbarOpacity: 0.4,
-    cursorColour: "#d0d0d0",
-  },
-});
-
 Blockly.blockRendering.register("custom_zelos", CustomRenderer);
 
 const toolbox = document.getElementById("toolbox");
@@ -158,21 +100,8 @@ export const workspace = Blockly.inject("blocklyDiv", {
 window.toolbox = toolbox;
 window.workspace = workspace;
 
-function toggleTheme(dark = false) {
-  if (dark) root.classList.add("dark");
-  else root.classList.remove("dark");
-  localStorage.setItem("theme", dark ? "dark" : "light");
-  workspace.setTheme(dark ? darkTheme : lightTheme, workspace);
-}
-
-function toggleIcons(removeIcons = false) {
-  if (removeIcons) root.classList.add("removeIcons");
-  else root.classList.remove("removeIcons");
-  localStorage.setItem("removeIcons", String(removeIcons));
-}
-
-toggleTheme(localStorage.getItem("theme") === "dark");
-toggleIcons(localStorage.getItem("removeIcons") === "true");
+toggleTheme(undefined, workspace);
+toggleIcons();
 
 workspace.registerToolboxCategoryCallback("GLOBAL_VARIABLES", function (ws) {
   const xmlList = [];
@@ -365,7 +294,7 @@ function createRenameableLabel(initialName, onRename) {
   nameLabel.style.margin = "0";
 
   const renameBtn = document.createElement("button");
-  renameBtn.textContent = "Rename";
+  renameBtn.innerHTML = '<i class="fa-solid fa-pencil"></i> Rename';
 
   renameBtn.onclick = () => {
     let willRename = true;
@@ -1767,12 +1696,12 @@ document.getElementById("theme-button").addEventListener("click", () =>
         {
           type: "button",
           label: '<i class="fa-solid fa-sun"></i> Light',
-          onClick: () => toggleTheme(false),
+          onClick: () => toggleTheme(false, workspace),
         },
         {
           type: "button",
           label: '<i class="fa-solid fa-moon"></i> Dark',
-          onClick: () => toggleTheme(true),
+          onClick: () => toggleTheme(true, workspace),
         },
       ],
       [
