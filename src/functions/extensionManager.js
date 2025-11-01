@@ -1,6 +1,6 @@
 import * as Blockly from "blockly";
 import * as BlocklyJS from "blockly/javascript";
-import { activeExtensions } from "./editor";
+import { activeExtensions } from "../scripts/editor";
 import { Thread } from "./threads";
 import { minify } from "terser";
 

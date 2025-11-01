@@ -1,4 +1,4 @@
-import { calculateBubblePosition } from "./editor";
+import { calculateBubblePosition } from "../scripts/editor";
 import { Thread } from "./threads";
 
 const BUBBLE_PADDING = 10;

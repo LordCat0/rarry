@@ -33,18 +33,30 @@
             </button>
         </div>
         <div>
-            <button id="save-button" class="green">
-                <i class="fa-solid fa-file-arrow-up"></i>
-                Save
-            </button>
-            <button id="load-button" class="orange">
-                <i class="fa-solid fa-file-arrow-down"></i>
-                Load
-            </button>
-            <input type="file" id="load-input" class="hidden" accept=".rarry" />
-            <button id="export-button">
+            <div class="dropdown">
+                <button>
+                    <i class="fa-solid fa-file-pen"></i>
+                    File
+                </button>
+                <div class="dropdown-content">
+                    <button id="save-button">
+                        <i class="fa-solid fa-file-arrow-up"></i>
+                        Save
+                    </button>
+                    <button id="load-button">
+                        <i class="fa-solid fa-file-arrow-down"></i>
+                        Load
+                    </button>
+                    <input type="file" id="load-input" class="hidden" accept=".rarryz, .rarry" />
+                    <button id="export-button">
+                        <i class="fa-solid fa-share-from-square"></i>
+                        Export
+                    </button>
+                </div>
+            </div>
+            <button id="liveshare-button">
                 <i class="fa-solid fa-share-from-square"></i>
-                Export
+                Live Share
             </button>
         </div>
     </header>
@@ -129,7 +141,7 @@
             </button>
         </header>
 
-        <div class="extensions-list" />
+        <div class="extensions-list"></div>
     </div>
 
     <xml id="toolbox" style="display: none">
@@ -478,10 +490,8 @@
         </category>
 
         <category name="Objects" colour="#ff8349">
-            <block type="json_create">
-                <mutation items="2"></mutation>
-            </block>
-            <block type="json_key_value">
+            <block type="json_create_statement"></block>
+            <block type="json_key_value_statement">
                 <value name="KEY">
                     <shadow type="text">
                         <field name="TEXT"></field>
@@ -533,6 +543,7 @@
     </xml>
 
     <script type="module" src="src/scripts/editor.js"></script>
+    <script type="module" src="src/scripts/index.js"></script>
 </body>
 
 </html>

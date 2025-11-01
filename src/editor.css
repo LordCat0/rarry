@@ -308,3 +308,21 @@ html.dark .blocklyToolboxCategory.blocklyToolboxSelected {
   width: 1.25rem;
   height: 1.25rem;
 }
+
+#room-users {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+#room-users div {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+#room-users div img {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 20%;
+}
