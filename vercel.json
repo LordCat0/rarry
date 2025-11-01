@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "http://rarry-api.onthewifi.com:14524/$1" }
+    { "source": "/api/(.*)", "destination": "http://217.160.125.127:14524/$1" }
   ]
 }
