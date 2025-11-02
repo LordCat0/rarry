@@ -756,40 +756,50 @@ tabButtons.forEach((button) => {
   });
 });
 
-export function getProject() {
-  return {
-    sprites: sprites.map((sprite) => ({
-      id: sprite.id,
-      code: sprite.code,
-      costumes: sprite.costumes.map((c) => {
-        let dataURL;
+export async function getProject() {
+  const spritesData = await Promise.all(
+    sprites.map(async (sprite) => {
+      const costumesData = await Promise.all(
+        sprite.costumes.map(async (c) => {
+          let dataURL;
+          const url = c?.texture?.baseTexture?.resource?.url;
+          if (typeof url === "string" && url.startsWith("data:")) {
+            dataURL = url;
+          } else {
+            dataURL = await app.renderer.extract.base64(
+              new PIXI.Sprite(c.texture)
+            );
+          }
+          return {
+            name: c.name,
+            data: dataURL,
+          };
+        })
+      );
 
-        const url = c?.texture?.baseTexture?.resource?.url;
-        if (typeof url === "string" && url.startsWith("data:")) {
-          dataURL = url;
-        } else {
-          dataURL = app.renderer.extract.base64(new PIXI.Sprite(c.texture));
-        }
-
-        return {
-          name: c.name,
-          data: dataURL,
-        };
-      }),
-      sounds: sprite.sounds.map((s) => ({ name: s.name, data: s.dataURL })),
-      data: {
-        x: sprite.pixiSprite.x,
-        y: sprite.pixiSprite.y,
-        scale: {
-          x: sprite.pixiSprite.scale.x ?? 1,
-          y: sprite.pixiSprite.scale.y ?? 1,
+      return {
+        id: sprite.id,
+        code: sprite.code,
+        costumes: costumesData,
+        sounds: sprite.sounds.map((s) => ({ name: s.name, data: s.dataURL })),
+        data: {
+          x: sprite.pixiSprite.x,
+          y: sprite.pixiSprite.y,
+          scale: {
+            x: sprite.pixiSprite.scale.x ?? 1,
+            y: sprite.pixiSprite.scale.y ?? 1,
+          },
+          angle: sprite.pixiSprite.angle,
+          currentCostume: sprite.costumes.findIndex(
+            (c) => c.texture === sprite.pixiSprite.texture
+          ),
         },
-        angle: sprite.pixiSprite.angle,
-        currentCostume: sprite.costumes.findIndex(
-          (c) => c.texture === sprite.pixiSprite.texture
-        ),
-      },
-    })),
+      };
+    })
+  );
+
+  return {
+    sprites: spritesData,
     extensions: activeExtensions,
     variables: window.projectVariables ?? {},
   };
@@ -1629,12 +1639,12 @@ function createSession() {
     updateUsersList();
   });
 
-  currentSocket.on("userJoined", ({ username, socketId }) => {
+  currentSocket.on("userJoined", async ({ username, socketId }) => {
     console.log(`${username} joined to room`);
     if (amHost) {
       currentSocket.emit("sendProjectData", {
         to: socketId,
-        data: getProject(),
+        data: await getProject(),
       });
     }
   });
