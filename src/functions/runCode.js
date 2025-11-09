@@ -7,6 +7,7 @@ const BUBBLE_PADDING = 10;
 const BUBBLE_TAIL_HEIGHT = 15;
 const BUBBLE_TAIL_WIDTH = 15;
 const BUBBLE_COLOR = 0xffffff;
+const BUBBLE_TEXTSTYLE = new PIXI.TextStyle({ fill: 0x000000, fontSize: 24 });
 const LINE_COLOR = 0xbdc1c7;
 
 export function runCodeWithFunctions({
@@ -23,13 +24,11 @@ export function runCodeWithFunctions({
   runningScripts,
   signal,
   penGraphics,
-  activeEventThreads,
-  updateRunButtonState,
+  activeEventThreads
 }) {
   Thread.resetAll();
   let fastExecution = false;
 
-  const BUBBLE_TEXTSTYLE = new PIXI.TextStyle({ fill: 0x000000, fontSize: 24 });
   const sprite = spriteData.pixiSprite;
   const renderer = app.renderer;
   const stage = app.stage;
@@ -59,9 +58,7 @@ export function runCodeWithFunctions({
 
         const threadId = Thread.create();
         Thread.enter(threadId);
-
         activeEventThreads.count++;
-        updateRunButtonState();
 
         try {
           const result = await promiseWithAbort(
@@ -74,7 +71,6 @@ export function runCodeWithFunctions({
         } finally {
           Thread.exit();
           activeEventThreads.count--;
-          updateRunButtonState();
         }
       },
     };

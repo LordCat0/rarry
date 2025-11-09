@@ -596,7 +596,18 @@ let eventRegistry = {
 };
 window.shouldStop = false;
 
-let activeEventThreads = { count: 0 };
+let _activeEventThreadsCount = 0;
+const activeEventThreads = {};
+
+Object.defineProperty(activeEventThreads, "count", {
+  get() {
+    return _activeEventThreadsCount;
+  },
+  set(value) {
+    _activeEventThreadsCount = Math.max(0, value);
+    updateRunButtonState();
+  },
+});
 
 function updateRunButtonState() {
   if (runningScripts.length > 0 || activeEventThreads.count > 0) {
@@ -626,7 +637,6 @@ function stopAllScripts() {
     else if (i.type === "raf") cancelAnimationFrame(i.id);
   }
   runningScripts.length = 0;
-  activeEventThreads.count = 0;
 
   for (const spriteSounds of playingSounds.values()) {
     for (const audio of spriteSounds.values()) {
@@ -663,7 +673,7 @@ function stopAllScripts() {
   }
 
   Thread.resetAll();
-  updateRunButtonState();
+  activeEventThreads.count = 0;
 }
 
 async function runCode() {
@@ -710,7 +720,6 @@ async function runCode() {
         signal,
         penGraphics,
         activeEventThreads,
-        updateRunButtonState
       });
     } catch (e) {
       console.error(`Error processing code for sprite ${spriteData.id}:`, e);
@@ -729,8 +738,6 @@ async function runCode() {
         console.error("Error running flag event:", res.reason);
       }
     });
-
-    updateRunButtonState();
   });
 }
 
