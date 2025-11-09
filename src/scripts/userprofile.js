@@ -1,12 +1,16 @@
 import config from "../config";
 import { cache } from "../cache";
 import { showPopup } from "../functions/utils";
+import { setupThemeButton, setupUserTag } from "../functions/theme";
 
 const allowedFileFormats = ["jpeg", "png", "webp", "avif", "gif", "tiff"];
 const profileDiv = document.getElementById("userProfile");
 
 const urlParams = new URLSearchParams(window.location.search);
 const identifier = urlParams.get("id") || urlParams.get("username");
+
+setupThemeButton();
+setupUserTag();
 
 if (profileDiv && identifier) {
   fetch(`${config.apiUrl}/users/${identifier}`, {
@@ -56,13 +60,16 @@ if (profileDiv && identifier) {
                       formData.append("avatar", file);
 
                       try {
-                        const res = await fetch(`${config.apiUrl}/users/me/avatar`, {
-                          method: "POST",
-                          headers: {
-                            Authorization: localStorage.getItem("tooken"),
-                          },
-                          body: formData,
-                        });
+                        const res = await fetch(
+                          `${config.apiUrl}/users/me/avatar`,
+                          {
+                            method: "POST",
+                            headers: {
+                              Authorization: localStorage.getItem("tooken"),
+                            },
+                            body: formData,
+                          }
+                        );
 
                         const data = await res.json();
                         if (!res.ok)
@@ -86,12 +93,15 @@ if (profileDiv && identifier) {
                   onClick: async (popup) => {
                     if (!confirm("Remove your avatar?")) return;
                     try {
-                      const res = await fetch(`${config.apiUrl}/users/me/avatar`, {
-                        method: "DELETE",
-                        headers: {
-                          Authorization: localStorage.getItem("tooken"),
-                        },
-                      });
+                      const res = await fetch(
+                        `${config.apiUrl}/users/me/avatar`,
+                        {
+                          method: "DELETE",
+                          headers: {
+                            Authorization: localStorage.getItem("tooken"),
+                          },
+                        }
+                      );
                       const data = await res.json();
                       if (!res.ok)
                         throw new Error(

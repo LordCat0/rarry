@@ -33,27 +33,15 @@
             </button>
         </div>
         <div>
-            <div class="dropdown">
-                <button>
-                    <i class="fa-solid fa-file-pen"></i>
-                    File
-                </button>
-                <div class="dropdown-content">
-                    <button id="save-button">
-                        <i class="fa-solid fa-file-arrow-up"></i>
-                        Save
-                    </button>
-                    <button id="load-button">
-                        <i class="fa-solid fa-file-arrow-down"></i>
-                        Load
-                    </button>
-                    <input type="file" id="load-input" class="hidden" accept=".rarryz, .rarry" />
-                    <button id="export-button">
-                        <i class="fa-solid fa-share-from-square"></i>
-                        Export
-                    </button>
-                </div>
-            </div>
+            <button id="save-button">
+                <i class="fa-solid fa-file-arrow-up"></i>
+                Save
+            </button>
+            <button id="load-button">
+                <i class="fa-solid fa-file-arrow-down"></i>
+                Load
+            </button>
+            <input type="file" id="load-input" class="hidden" accept=".rarryz, .rarry" />
             <button id="liveshare-button">
                 <i class="fa-solid fa-share-from-square"></i>
                 Live Share
@@ -145,6 +133,68 @@
     </div>
 
     <xml id="toolbox" style="display: none">
+        <category name="Events" colour="#ffc400">
+            <block type="when_flag_clicked"></block>
+            <block type="project_timer"></block>
+            <block type="when_key_clicked"></block>
+            <block type="when_stage_clicked"></block>
+        </category>
+
+        <category name="Control" colour="#FFAB19">
+            <block type="wait_one_frame"></block>
+            <block type="wait_block">
+                <value name="AMOUNT">
+                    <shadow type="math_number">
+                        <field name="NUM">2</field>
+                    </shadow>
+                </value>
+            </block>
+            <sep gap="50"></sep>
+            <block type="controls_if"></block>
+            <block type="controls_repeat_ext">
+                <value name="TIMES">
+                    <shadow type="math_number">
+                        <field name="NUM">2</field>
+                    </shadow>
+                </value>
+            </block>
+            <block type="controls_whileUntil"></block>
+            <block type="controls_flow_statements"></block>
+            <block type="controls_run_instantly"></block>
+            <sep gap="50"></sep>
+            <block type="controls_thread_current"></block>
+            <block type="controls_thread_create"></block>
+            <block type="controls_thread_set_var">
+                <value name="THREAD">
+                    <shadow type="controls_thread_current"></shadow>
+                </value>
+                <value name="NAME">
+                    <shadow type="text">
+                        <field name="TEXT">name</field>
+                    </shadow>
+                </value>
+                <value name="VALUE">
+                    <shadow type="math_number">
+                        <field name="NUM">0</field>
+                    </shadow>
+                </value>
+            </block>
+            <block type="controls_thread_get_var">
+                <value name="THREAD">
+                    <shadow type="controls_thread_current"></shadow>
+                </value>
+                <value name="NAME">
+                    <shadow type="text">
+                        <field name="TEXT">name</field>
+                    </shadow>
+                </value>
+            </block>
+        </category>
+
+        <category name="Functions" colour="#FF6680" custom="PROCEDURE"></category>
+
+        <sep></sep>
+
         <category name="Motion" colour="#4C97FF">
             <block type="move_steps">
                 <value name="STEPS">
@@ -276,78 +326,7 @@
             <block type="get_sound_property"></block>
         </category>
 
-        <category name="Events" colour="#ffc400">
-            <block type="when_flag_clicked"></block>
-            <block type="project_timer"></block>
-        </category>
-
-        <category name="Control" colour="#FFAB19">
-            <block type="wait_one_frame"></block>
-            <block type="wait_block">
-                <value name="AMOUNT">
-                    <shadow type="math_number">
-                        <field name="NUM">2</field>
-                    </shadow>
-                </value>
-            </block>
-            <sep gap="50"></sep>
-            <block type="controls_if"></block>
-            <block type="controls_repeat_ext">
-                <value name="TIMES">
-                    <shadow type="math_number">
-                        <field name="NUM">2</field>
-                    </shadow>
-                </value>
-            </block>
-            <block type="controls_whileUntil"></block>
-            <block type="controls_for">
-                <value name="FROM">
-                    <shadow type="math_number">
-                        <field name="NUM">1</field>
-                    </shadow>
-                </value>
-                <value name="TO">
-                    <shadow type="math_number">
-                        <field name="NUM">10</field>
-                    </shadow>
-                </value>
-                <value name="BY">
-                    <shadow type="math_number">
-                        <field name="NUM">1</field>
-                    </shadow>
-                </value>
-            </block>
-            <block type="controls_flow_statements"></block>
-            <block type="controls_run_instantly"></block>
-            <sep gap="50"></sep>
-            <block type="controls_thread_current"></block>
-            <block type="controls_thread_create"></block>
-            <block type="controls_thread_set_var">
-                <value name="THREAD">
-                    <shadow type="controls_thread_current"></shadow>
-                </value>
-                <value name="NAME">
-                    <shadow type="text">
-                        <field name="TEXT">name</field>
-                    </shadow>
-                </value>
-                <value name="VALUE">
-                    <shadow type="math_number">
-                        <field name="NUM">0</field>
-                    </shadow>
-                </value>
-            </block>
-            <block type="controls_thread_get_var">
-                <value name="THREAD">
-                    <shadow type="controls_thread_current"></shadow>
-                </value>
-                <value name="NAME">
-                    <shadow type="text">
-                        <field name="TEXT">name</field>
-                    </shadow>
-                </value>
-            </block>
-        </category>
+        <sep></sep>
 
         <category name="Operators" colour="#59ba57">
             <label text="Logic"></label>
@@ -440,6 +419,7 @@
                     </shadow>
                 </value>
             </block>
+            <sep gap="50"></sep>
             <block type="lists_length"></block>
             <block type="lists_isEmpty"></block>
             <block type="lists_indexOf"></block>
@@ -486,7 +466,9 @@
                     </block>
                 </value>
             </block>
-            <block type="controls_forEach"></block>
+            <sep gap="50"></sep>
+            <block type="lists_foreach"></block>
+            <block type="lists_filter_item"></block>
         </category>
 
         <category name="Objects" colour="#ff8349">
@@ -538,12 +520,9 @@
         </category>
 
         <category name="Variables" colour="#FF8C1A" custom="GLOBAL_VARIABLES"></category>
-
-        <category name="Functions" colour="#FF6680" custom="PROCEDURE"></category>
     </xml>
 
     <script type="module" src="src/scripts/editor.js"></script>
-    <script type="module" src="src/scripts/index.js"></script>
 </body>
 
 </html>

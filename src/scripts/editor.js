@@ -8,7 +8,7 @@ import JSZip from "jszip";
 import { io } from "socket.io-client";
 
 import CustomRenderer from "../functions/render.js";
-import { toggleTheme } from "../functions/theme.js";
+import { setupThemeButton } from "../functions/theme.js";
 import {
   promiseWithAbort,
   showNotification,
@@ -22,12 +22,11 @@ import {
 } from "../functions/extensionManager.js";
 import { Thread } from "../functions/threads.js";
 import { runCodeWithFunctions } from "../functions/runCode.js";
-import { downloadStandaloneHTML } from "../functions/export.js";
 
 import config from "../config";
 
 BlocklyJS.javascriptGenerator.addReservedWords(
-  "whenFlagClicked,moveSteps,changePosition,setPosition,getPosition,getAngle,getMousePosition,sayMessage,waitOneFrame,wait,switchCostume,setSize,setAngle,projectTime,isKeyPressed,isMouseButtonPressed,getCostumeSize,getSpriteScale,_startTween,startTween,soundProperties,getSoundProperty,setSoundProperty,playSound,stopSound,stopAllSounds,isMouseTouchingSprite,setPenStatus,setPenColor,setPenColorHex,setPenSize,clearPen,Thread,fastExecution,BUBBLE_TEXTSTYLE,sprite,renderer,stage,costumeMap,soundMap,stopped,code,penGraphics,runningScripts,findOrFilterItem"
+  "whenFlagClicked,moveSteps,getAngle,getMousePosition,sayMessage,waitOneFrame,wait,switchCostume,setSize,setAngle,projectTime,isKeyPressed,isMouseButtonPressed,getCostumeSize,getSpriteScale,_startTween,startTween,soundProperties,setSoundProperty,playSound,stopSound,stopAllSounds,isMouseTouchingSprite,setPenStatus,setPenColor,setPenColorHex,setPenSize,clearPen,Thread,fastExecution,BUBBLE_TEXTSTYLE,sprite,renderer,stage,costumeMap,soundMap,stopped,code,penGraphics,runningScripts,findOrFilterItem"
 );
 
 import.meta.glob("../blocks/**/*.js", { eager: true });
@@ -46,6 +45,7 @@ const costumesList = document.getElementById("costumes-list");
 const loadInput = document.getElementById("load-input");
 const loadButton = document.getElementById("load-button");
 const deleteSpriteButton = document.getElementById("delete-sprite-button");
+const runButton = document.getElementById("run-button");
 const tabButtons = document.querySelectorAll(".tab-button");
 const tabContents = document.querySelectorAll(".tab-content");
 const fullscreenButton = document.getElementById("fullscreen-button");
@@ -122,7 +122,7 @@ export const workspace = Blockly.inject("blocklyDiv", {
 window.toolbox = toolbox;
 window.workspace = workspace;
 
-toggleTheme(undefined, workspace);
+setupThemeButton(workspace);
 
 workspace.registerToolboxCategoryCallback("GLOBAL_VARIABLES", function (_) {
   const xmlList = [];
@@ -588,9 +588,25 @@ const playingSounds = new Map();
 
 let currentRunId = 0;
 let currentRunController = null;
-const flagEvents = [];
-const runningScripts = [];
+
+let eventRegistry = {
+  flag: [],
+  key: new Map(),
+  stageClick: [],
+};
 window.shouldStop = false;
+
+let activeEventThreads = { count: 0 };
+
+function updateRunButtonState() {
+  if (runningScripts.length > 0 || activeEventThreads.count > 0) {
+    runButton.classList.add("active");
+  } else {
+    runButton.classList.remove("active");
+  }
+}
+
+const runningScripts = [];
 
 function stopAllScripts() {
   window.shouldStop = true;
@@ -601,47 +617,61 @@ function stopAllScripts() {
     } catch (e) {}
     currentRunController = null;
   }
+
   currentRunId++;
 
-  runningScripts.forEach((i) => {
+  for (const i of runningScripts) {
     if (i.type === "timeout") clearTimeout(i.id);
     else if (i.type === "interval") clearInterval(i.id);
     else if (i.type === "raf") cancelAnimationFrame(i.id);
-  });
+  }
   runningScripts.length = 0;
+  activeEventThreads.count = 0;
 
-  flagEvents.length = 0;
+  for (const spriteSounds of playingSounds.values()) {
+    for (const audio of spriteSounds.values()) {
+      try {
+        audio.pause();
+        audio.currentTime = 0;
+      } catch (e) {}
+    }
+  }
+  playingSounds.clear();
 
-  Object.keys(keysPressed).forEach((k) => delete keysPressed[k]);
-  Object.keys(mouseButtonsPressed).forEach(
-    (k) => delete mouseButtonsPressed[k]
-  );
-
-  sprites.forEach((spriteData) => {
-    let bubble = spriteData.currentBubble;
+  for (const spriteData of sprites) {
+    const bubble = spriteData.currentBubble;
     if (bubble) {
       if (bubble.destroy) bubble.destroy({ children: true });
       spriteData.currentBubble = null;
     }
+
     if (spriteData.sayTimeout) {
       clearTimeout(spriteData.sayTimeout);
       spriteData.sayTimeout = null;
     }
-  });
+  }
 
-  for (const spriteSounds of playingSounds.values()) {
-    for (const audio of spriteSounds.values()) {
-      audio.pause();
-      audio.currentTime = 0;
+  for (const k in keysPressed) delete keysPressed[k];
+  for (const k in mouseButtonsPressed) delete mouseButtonsPressed[k];
+
+  for (const type in eventRegistry) {
+    if (Array.isArray(eventRegistry[type])) {
+      eventRegistry[type].length = 0;
+    } else if (eventRegistry[type] instanceof Map) {
+      eventRegistry[type].clear();
     }
   }
-  playingSounds.clear();
+
+  Thread.resetAll();
+  updateRunButtonState();
 }
 
 async function runCode() {
   stopAllScripts();
 
-  await new Promise((resolve) => requestAnimationFrame(resolve));
+  await new Promise((r) => requestAnimationFrame(r));
+
+  runButton.classList.add("active");
 
   const controller = new AbortController();
   const signal = controller.signal;
@@ -672,41 +702,43 @@ async function runCode() {
         projectStartedTime,
         spriteData,
         app,
-        flagEvents,
+        eventRegistry,
         mouseButtonsPressed,
         keysPressed,
         playingSounds,
         runningScripts,
         signal,
-        promiseWithAbort,
-        PIXI,
-        runningScripts,
         penGraphics,
+        activeEventThreads,
+        updateRunButtonState
       });
     } catch (e) {
       console.error(`Error processing code for sprite ${spriteData.id}:`, e);
     }
   });
 
-  const eventsForThisRun = flagEvents.filter((e) => e.runId === thisRun);
-
-  for (const e of eventsForThisRun) {
-    const idx = flagEvents.indexOf(e);
-    if (idx !== -1) flagEvents.splice(idx, 1);
-  }
+  const flagEventsForThisRun = eventRegistry.flag.filter(
+    (e) => e.runId === thisRun
+  );
 
   Promise.allSettled(
-    eventsForThisRun.map((entry) => promiseWithAbort(entry.cb, signal))
+    flagEventsForThisRun.map((entry) => promiseWithAbort(entry.cb, signal))
   ).then((results) => {
     results.forEach((res) => {
-      if (res.status === "rejected") {
-        const e = res.reason;
-        if (e?.message === "shouldStop") return;
-        console.error(`Error running flag event:`, e);
+      if (res.status === "rejected" && res.reason?.message !== "shouldStop") {
+        console.error("Error running flag event:", res.reason);
       }
     });
+
+    updateRunButtonState();
   });
 }
+
+app.view.addEventListener("click", () => {
+  for (const entry of eventRegistry.stageClick) {
+    entry.cb();
+  }
+});
 
 document.getElementById("add-sprite-button").addEventListener("click", () => {
   let spriteData = addSprite(null, true);
@@ -717,7 +749,7 @@ deleteSpriteButton.addEventListener("click", () =>
   deleteSprite(activeSprite.id, true)
 );
 
-document.getElementById("run-button").addEventListener("click", runCode);
+runButton.addEventListener("click", runCode);
 document
   .getElementById("stop-button")
   .addEventListener("click", stopAllScripts);
@@ -1267,16 +1299,30 @@ const allowedKeys = new Set([
 ]);
 window.addEventListener("keydown", (e) => {
   const key = e.key;
-  if (allowedKeys.has(key)) {
-    keysPressed[key] = true;
+  keysPressed[key] = true;
+
+  const specificHandlers = eventRegistry.key.get(key);
+  if (specificHandlers) {
+    for (const entry of specificHandlers) {
+      entry.cb();
+    }
+  }
+
+  const anyHandlers = eventRegistry.key.get("any");
+  if (anyHandlers) {
+    for (const entry of anyHandlers) {
+      entry.cb(key);
+    }
   }
 });
+
 window.addEventListener("keyup", (e) => {
   const key = e.key;
   if (allowedKeys.has(key)) {
     keysPressed[key] = false;
   }
 });
+
 window.addEventListener("blur", () => {
   for (const key in keysPressed) {
     keysPressed[key] = false;
@@ -1503,10 +1549,6 @@ fullscreenButton.addEventListener("click", () => {
 });
 
 document
-  .getElementById("export-button")
-  .addEventListener("click", () => downloadStandaloneHTML());
-
-document
   .getElementById("extensions-custom-button")
   .addEventListener("click", () => {
     const isSharing = currentSocket && currentRoom;
@@ -1598,7 +1640,7 @@ document
             },
           },
           isSharing
-            ? "You can't add custom extensions while sharing the project."
+            ? "You can't add custom extensions while live sharing the project."
             : "",
         ],
       ],
@@ -1931,7 +1973,7 @@ if (roomId) {
   setActiveSprite(spriteData);
 }
 
-const ignoredEvents = [
+const ignoredEvents = new Set([
   Blockly.Events.VIEWPORT_CHANGE,
   Blockly.Events.SELECTED,
   Blockly.Events.CLICK,
@@ -1943,11 +1985,11 @@ const ignoredEvents = [
   Blockly.Events.THEME_CHANGE,
   Blockly.Events.BUBBLE_OPEN,
   "backpack_change",
-];
+]);
 
 workspace.addChangeListener((event) => {
   if (event.type === Blockly.Events.BLOCK_DRAG && event.isStart) return;
-  if (activeSprite && !ignoredEvents.includes(event.type)) {
+  if (activeSprite && !ignoredEvents.has(event.type)) {
     activeSprite.code = serializeWorkspace(workspace);
 
     if (currentSocket && currentRoom) {

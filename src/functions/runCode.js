@@ -1,5 +1,7 @@
+import * as PIXI from "pixi.js-legacy";
 import { calculateBubblePosition } from "../scripts/editor";
 import { Thread } from "./threads";
+import { promiseWithAbort } from "./utils";
 
 const BUBBLE_PADDING = 10;
 const BUBBLE_TAIL_HEIGHT = 15;
@@ -14,18 +16,18 @@ export function runCodeWithFunctions({
   projectStartedTime,
   spriteData,
   app,
-  flagEvents,
+  eventRegistry,
   mouseButtonsPressed,
   keysPressed,
   playingSounds,
-  promiseWithAbort,
-  signal,
-  PIXI,
   runningScripts,
+  signal,
   penGraphics,
+  activeEventThreads,
+  updateRunButtonState,
 }) {
   Thread.resetAll();
-  var fastExecution = false;
+  let fastExecution = false;
 
   const BUBBLE_TEXTSTYLE = new PIXI.TextStyle({ fill: 0x000000, fontSize: 24 });
   const sprite = spriteData.pixiSprite;
@@ -45,12 +47,12 @@ export function runCodeWithFunctions({
     );
   }
 
-  function whenFlagClicked(callback) {
+  function _registerEvent(type, key, callback) {
     if (stopped()) return;
-
     const runId = thisRun;
 
-    flagEvents.push({
+    const entry = {
+      type,
       runId,
       cb: async () => {
         if (stopped()) return;
@@ -58,48 +60,56 @@ export function runCodeWithFunctions({
         const threadId = Thread.create();
         Thread.enter(threadId);
 
+        activeEventThreads.count++;
+        updateRunButtonState();
+
         try {
           const result = await promiseWithAbort(
             () => callback(Thread.getCurrentContext()),
             signal
           );
-
           if (result === "shouldStop" || stopped()) return;
         } catch (err) {
           if (err.message !== "shouldStop") console.error(err);
         } finally {
           Thread.exit();
+          activeEventThreads.count--;
+          updateRunButtonState();
         }
       },
-    });
+    };
+
+    switch (type) {
+      case "flag":
+        eventRegistry.flag.push(entry);
+        break;
+      case "key":
+        if (!eventRegistry.key.has(key)) eventRegistry.key.set(key, []);
+        eventRegistry.key.get(key).push(entry);
+        break;
+      case "stageClick":
+        eventRegistry.stageClick.push(entry);
+        break;
+    }
   }
 
-  function moveSteps(steps) {
-    if (stopped()) return;
-    const angle = sprite.rotation;
-    sprite.x += Math.cos(angle) * +steps;
-    sprite.y += Math.sin(angle) * +steps;
+  function whenFlagClicked(callback) {
+    _registerEvent("flag", null, callback);
   }
 
-  function changePosition(menu, amount) {
-    if (stopped()) return;
-    if (menu === "x") sprite.x += +amount;
-    else if (menu === "y") sprite.y -= +amount;
+  function whenKeyPressed(key, callback) {
+    _registerEvent("key", key, callback);
   }
 
-  function setPosition(menu, x, y) {
-    if (stopped()) return;
-    if (menu === "x") sprite.x = +x;
-    else if (menu === "y") sprite.y = -+y;
-    else if (menu === "xy") sprite.setPosition(+x, -+y);
+  function whenStageClicked(callback) {
+    _registerEvent("stageClick", null, callback);
   }
 
-  function getPosition(menu) {
-    if (menu === "x") return sprite.x;
-    else if (menu === "y") return -sprite.y;
+  function moveSteps(steps = 0) {
+    const { rotation: a } = sprite;
+    sprite.x += Math.cos(a) * steps;
+    sprite.y += Math.sin(a) * steps;
   }
-
-  const getAngle = () => sprite.angle;
 
   function getMousePosition(menu) {
     const mouse = renderer.plugins.interaction.mouse.global;
@@ -110,8 +120,6 @@ export function runCodeWithFunctions({
   }
 
   function sayMessage(message, seconds) {
-    if (stopped()) return;
-
     message = String(message ?? "");
     if (!message) return;
 
@@ -209,39 +217,27 @@ export function runCodeWithFunctions({
   }
 
   function switchCostume(name) {
-    if (stopped()) return;
-
     const found = costumeMap.get(name);
     if (found) {
       sprite.texture = found.texture;
     }
   }
 
-  function setSize(amount, additive) {
-    if (stopped()) return;
-
-    if (additive) {
-      const scaleX = sprite.scale.x + amount / 100;
-      const scaleY = sprite.scale.y + amount / 100;
-      sprite.scale.set(scaleX, scaleY);
-    } else {
-      const scale = amount / 100;
-      sprite.scale.set(scale, scale);
-    }
+  function setSize(amount = 0, additive) {
+    let amountN = amount / 100;
+    if (additive)
+      sprite.scale.set(sprite.scale.x + amountN, sprite.scale.y + amountN);
+    else sprite.scale.set(amountN, amountN);
   }
 
   function setAngle(amount, additive) {
-    if (stopped()) return;
-
     if (additive) {
       sprite.angle = (sprite.angle + amount) % 360;
     } else {
       sprite.angle = amount % 360;
     }
 
-    if (sprite.angle < 0) {
-      sprite.angle += 360;
-    }
+    if (sprite.angle < 0) sprite.angle += 360;
   }
 
   function projectTime() {
@@ -261,7 +257,7 @@ export function runCodeWithFunctions({
       return Object.values(mouseButtonsPressed).some((pressed) => pressed);
     }
 
-    return !!mouseButtonsPressed[+button];
+    return !!mouseButtonsPressed[button];
   }
 
   function getCostumeSize(type) {
@@ -279,10 +275,10 @@ export function runCodeWithFunctions({
     return ((scaleX + scaleY) / 2) * 100;
   }
 
-  function _startTween({ from, to, duration, easing, onUpdate, wait = true }) {
-    if (stopped()) return "shouldStop";
+  function startTween({ from, to, duration, easing, onUpdate, wait = true }) {
+    if (stopped()) return;
 
-    const tweenPromise = new Promise((resolve, reject) => {
+    const tweenPromise = new Promise((resolve) => {
       const start = performance.now();
       const change = to - from;
       const easeFn = window.TweenEasing[easing] || window.TweenEasing.linear;
@@ -312,18 +308,11 @@ export function runCodeWithFunctions({
     return wait ? tweenPromise : undefined;
   }
 
-  async function startTween(options) {
-    if (stopped()) return;
-    const result = await _startTween(options);
-    if (result === "shouldStop") return;
-  }
-
   let soundProperties = {
     volume: 100,
     speed: 100,
   };
 
-  const getSoundProperty = (property) => soundProperties[property];
   function setSoundProperty(property, value) {
     if (!soundProperties[property]) return;
     if (property === "speed") value = Math.min(1600, Math.max(7, value));
@@ -430,8 +419,8 @@ export function runCodeWithFunctions({
       : 0x000000;
   }
 
-  function setPenSize(size) {
-    spriteData.penSize = Math.max(1, +size);
+  function setPenSize(size = 0) {
+    spriteData.penSize = Math.max(1, size);
   }
 
   function clearPen() {
