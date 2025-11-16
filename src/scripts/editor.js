@@ -10,6 +10,7 @@ import { io } from "socket.io-client";
 import CustomRenderer from "../functions/render.js";
 import { setupThemeButton } from "../functions/theme.js";
 import {
+  compressAudio,
   promiseWithAbort,
   showNotification,
   showPopup,
@@ -26,7 +27,7 @@ import { runCodeWithFunctions } from "../functions/runCode.js";
 import config from "../config";
 
 BlocklyJS.javascriptGenerator.addReservedWords(
-  "whenFlagClicked,moveSteps,getAngle,getMousePosition,sayMessage,waitOneFrame,wait,switchCostume,setSize,setAngle,projectTime,isKeyPressed,isMouseButtonPressed,getCostumeSize,getSpriteScale,_startTween,startTween,soundProperties,setSoundProperty,playSound,stopSound,stopAllSounds,isMouseTouchingSprite,setPenStatus,setPenColor,setPenColorHex,setPenSize,clearPen,Thread,fastExecution,BUBBLE_TEXTSTYLE,sprite,renderer,stage,costumeMap,soundMap,stopped,code,penGraphics,runningScripts,findOrFilterItem"
+  "whenFlagClicked,moveSteps,getAngle,getMousePosition,sayMessage,waitOneFrame,wait,switchCostume,setSize,setAngle,projectTime,isKeyPressed,isMouseButtonPressed,getCostumeSize,getSpriteScale,_startTween,startTween,soundProperties,setSoundProperty,playSound,stopSound,stopAllSounds,isMouseTouchingSprite,setPenStatus,setPenColor,setPenColorHex,setPenSize,clearPen,Thread,fastExecution,BUBBLE_TEXTSTYLE,sprite,renderer,stage,costumeMap,soundMap,stopped,code,penGraphics,runningScripts,findOrFilterItem,registerEvent,triggerCustomEvent,hideSprite,showSprite"
 );
 
 import.meta.glob("../blocks/**/*.js", { eager: true });
@@ -91,8 +92,7 @@ function createPenGraphics() {
 }
 createPenGraphics();
 
-window.projectVariables = {};
-
+export let projectVariables = {};
 export let sprites = [];
 export let activeSprite = null;
 
@@ -119,8 +119,6 @@ export const workspace = Blockly.inject("blocklyDiv", {
     scaleSpeed: 1.2,
   },
 });
-window.toolbox = toolbox;
-window.workspace = workspace;
 
 setupThemeButton(workspace);
 
@@ -132,7 +130,7 @@ workspace.registerToolboxCategoryCallback("GLOBAL_VARIABLES", function (_) {
   button.setAttribute("callbackKey", "ADD_GLOBAL_VARIABLE");
   xmlList.push(button);
 
-  if (Object.keys(window.projectVariables).length === 0) return xmlList;
+  if (Object.keys(projectVariables).length === 0) return xmlList;
 
   const valueShadow = Blockly.utils.xml.createElement("value");
   valueShadow.setAttribute("name", "VALUE");
@@ -154,7 +152,7 @@ workspace.registerToolboxCategoryCallback("GLOBAL_VARIABLES", function (_) {
   change.appendChild(valueShadow);
   xmlList.push(change);
 
-  for (const name in window.projectVariables) {
+  for (const name in projectVariables) {
     const get = Blockly.utils.xml.createElement("block");
     get.setAttribute("type", "get_global_var");
     const varField = Blockly.utils.xml.createElement("field");
@@ -172,12 +170,12 @@ function addGlobalVariable(name, emit = false) {
   if (name) {
     let newName = name,
       count = 0;
-    while (newName in window.projectVariables) {
+    while (newName in projectVariables) {
       count++;
       newName = name + count;
     }
 
-    window.projectVariables[newName] = 0;
+    projectVariables[newName] = 0;
 
     if (emit && currentSocket && currentRoom)
       currentSocket.emit("projectUpdate", {
@@ -326,10 +324,10 @@ function renderSpriteInfo() {
     const sprite = activeSprite.pixiSprite;
 
     infoEl.innerHTML = `
-    <p>x: ${Math.round(sprite.x)}</p>
-    <p>y: ${Math.round(-sprite.y)}</p>
-    <p>angle: ${Math.round(sprite.angle)}</p>
+    <p>${Math.round(sprite.x)}, ${Math.round(-sprite.y)}</p>
+    <p>${Math.round(sprite.angle)}º</p>
     <p>size: ${Math.round(((sprite.scale.x + sprite.scale.y) / 2) * 100)}</p>
+    <p><i class="fa-solid fa-${sprite.visible ? "eye" : "eye-slash"}"></i></p>
     `;
   }
 }
@@ -343,14 +341,10 @@ function createRenameableLabel(initialName, onRename) {
   const nameLabel = document.createElement("p");
   nameLabel.textContent = initialName;
   nameLabel.style.margin = "0";
+  nameLabel.style.cursor = "pointer";
 
-  const renameBtn = document.createElement("button");
-  renameBtn.innerHTML = '<i class="fa-solid fa-pencil"></i> Rename';
-
-  renameBtn.onclick = () => {
+  function startRename() {
     let willRename = true;
-
-    renameBtn.style.display = "none";
 
     const input = document.createElement("input");
     input.type = "text";
@@ -370,7 +364,6 @@ function createRenameableLabel(initialName, onRename) {
         }
       }
       container.replaceChild(nameLabel, input);
-      renameBtn.style.display = "";
     }
 
     input.addEventListener("blur", commit);
@@ -378,12 +371,13 @@ function createRenameableLabel(initialName, onRename) {
       if (e.key === "Enter") input.blur();
       else if (e.key === "Escape") {
         willRename = false;
+        input.blur();
       }
     });
-  };
+  }
 
+  nameLabel.addEventListener("click", startRename);
   container.appendChild(nameLabel);
-  container.appendChild(renameBtn);
 
   return container;
 }
@@ -427,6 +421,18 @@ function renderCostumesList() {
       }
     });
 
+    const _texture = costume.texture.baseTexture || costume.texture;
+    const sizeLabel = document.createElement("span");
+    sizeLabel.className = "smallLabel";
+    sizeLabel.textContent = "Loading...";
+    if (_texture.valid) {
+      sizeLabel.textContent = `${_texture.width}x${_texture.height}`;
+    } else {
+      _texture.once("update", () => {
+        sizeLabel.textContent = `${_texture.width}x${_texture.height}`;
+      });
+    }
+
     const deleteBtn = createDeleteButton(() => {
       const deleted = activeSprite.costumes[index];
       activeSprite.costumes.splice(index, 1);
@@ -452,6 +458,7 @@ function renderCostumesList() {
     costumeContainer.appendChild(img);
     costumeContainer.appendChild(renameableLabel);
     costumeContainer.appendChild(deleteBtn);
+    costumeContainer.appendChild(sizeLabel);
 
     costumesList.appendChild(costumeContainer);
   });
@@ -494,9 +501,7 @@ function renderSoundsList() {
     let sizeLabel;
     if (typeof sizeBytes === "number" && sizeBytes > 0) {
       sizeLabel = document.createElement("span");
-      sizeLabel.style.marginLeft = "auto";
-      sizeLabel.style.fontSize = "0.8em";
-      sizeLabel.style.color = "#666";
+      sizeLabel.className = "smallLabel";
 
       const sizeKB = sizeBytes / 1024;
       if (sizeKB < 1024) {
@@ -506,23 +511,24 @@ function renderSoundsList() {
       }
     }
 
-    const playButton = document.createElement("button");
-    playButton.textContent = "Play";
-    playButton.className = "primary";
+    const playButton = document.createElement("img");
+    playButton.src = "icons/play.svg";
+    playButton.className = "button";
+    playButton.draggable = false;
     playButton.onclick = () => {
       if (playButton.audio) {
         playButton.audio.pause();
         playButton.audio.currentTime = 0;
-        playButton.textContent = "Play";
+        playButton.src = "icons/play.svg";
         playButton.audio = null;
       } else {
         const audio = new Audio(sound.dataURL);
         playButton.audio = audio;
-        playButton.textContent = "Stop";
+        playButton.src = "icons/stopAudio.svg";
 
         audio.addEventListener("ended", () => {
           if (playButton.audio === audio) {
-            playButton.textContent = "Play";
+            playButton.src = "icons/play.svg";
             playButton.audio = null;
           }
         });
@@ -592,6 +598,9 @@ let eventRegistry = {
   flag: [],
   key: new Map(),
   stageClick: [],
+  timer: [],
+  interval: [],
+  custom: new Map(),
 };
 
 let _activeEventThreadsCount = 0;
@@ -683,48 +692,65 @@ async function runCode() {
 
   let projectStartedTime = Date.now();
 
-  sprites.forEach((spriteData) => {
-    const tempWorkspace = new Blockly.Workspace();
-    BlocklyJS.javascriptGenerator.init(tempWorkspace);
+  try {
+    for (const spriteData of sprites) {
+      const tempWorkspace = new Blockly.Workspace();
+      BlocklyJS.javascriptGenerator.init(tempWorkspace);
 
-    const xmlText =
-      spriteData.code ||
-      '<xml xmlns="https://developers.google.com/blockly/xml"></xml>';
-    const xmlDom = Blockly.utils.xml.textToDom(xmlText);
-    Blockly.Xml.domToWorkspace(xmlDom, tempWorkspace);
+      const xmlText =
+        spriteData.code ||
+        '<xml xmlns="https://developers.google.com/blockly/xml"></xml>';
+      const xmlDom = Blockly.utils.xml.textToDom(xmlText);
+      Blockly.Xml.domToWorkspace(xmlDom, tempWorkspace);
 
-    const code = BlocklyJS.javascriptGenerator.workspaceToCode(tempWorkspace);
-    tempWorkspace.dispose();
+      const code = BlocklyJS.javascriptGenerator.workspaceToCode(tempWorkspace);
+      tempWorkspace.dispose();
 
-    try {
-      runCodeWithFunctions({
-        code,
-        projectStartedTime,
-        spriteData,
-        app,
-        eventRegistry,
-        mouseButtonsPressed,
-        keysPressed,
-        playingSounds,
-        runningScripts,
-        signal,
-        penGraphics,
-        activeEventThreads,
-      });
-    } catch (e) {
-      console.error(`Error processing code for sprite ${spriteData.id}:`, e);
+      try {
+        runCodeWithFunctions({
+          code,
+          projectStartedTime,
+          spriteData,
+          app,
+          eventRegistry,
+          mouseButtonsPressed,
+          keysPressed,
+          playingSounds,
+          runningScripts,
+          signal,
+          penGraphics,
+          activeEventThreads,
+        });
+      } catch (e) {
+        console.error(`Error processing code for sprite ${spriteData.id}:`, e);
+      }
     }
-  });
 
-  Promise.allSettled(
-    eventRegistry.flag.map((entry) => promiseWithAbort(entry.cb, signal))
-  ).then((results) => {
+    const results = await Promise.allSettled(
+      eventRegistry.flag.map((entry) => promiseWithAbort(entry.cb, signal))
+    );
+
     results.forEach((res) => {
       if (res.status === "rejected" && res.reason?.message !== "shouldStop") {
         console.error("Error running flag event:", res.reason);
       }
     });
-  });
+
+    for (const entry of eventRegistry.timer) {
+      const id = setTimeout(() => entry.cb(), entry.value * 1000);
+      runningScripts.push({ type: "timeout", id });
+    }
+
+    for (const entry of eventRegistry.interval) {
+      const id = setInterval(() => entry.cb(), entry.seconds * 1000);
+      runningScripts.push({ type: "interval", id });
+    }
+  } catch (err) {
+    console.error("Error running project:", err);
+    stopAllScripts();
+  } finally {
+    updateRunButtonState();
+  }
 }
 
 app.view.addEventListener("click", () => {
@@ -751,12 +777,12 @@ tabButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const tab = button.dataset.tab;
     if (tab !== "sounds") {
-      document.querySelectorAll("#sounds-list button").forEach((i) => {
+      document.querySelectorAll("#sounds-list .button").forEach((i) => {
         if (i.audio) {
           i.audio.pause();
           i.audio.currentTime = 0;
           i.audio = null;
-          i.textContent = "Play";
+          i.src = "icons/play.svg";
         }
       });
     }
@@ -826,7 +852,7 @@ export async function getProject() {
   return {
     sprites: spritesData,
     extensions: activeExtensions,
-    variables: window.projectVariables ?? {},
+    variables: projectVariables ?? {},
   };
 }
 
@@ -835,7 +861,7 @@ async function saveProject() {
   const json = {
     sprites: [],
     extensions: activeExtensions,
-    variables: window.projectVariables ?? {},
+    variables: projectVariables ?? {},
   };
   const toUint8Array = (base64) =>
     Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
@@ -1089,7 +1115,7 @@ async function handleProjectData(data) {
       return;
     }
 
-    if (data.variables) window.projectVariables = data.variables;
+    if (data.variables) projectVariables = data.variables;
     createPenGraphics();
 
     data?.sprites?.forEach((entry, i) => {
@@ -1218,48 +1244,55 @@ document.getElementById("costume-upload").addEventListener("change", (e) => {
   e.target.value = "";
 });
 
-document.getElementById("sound-upload").addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if (!file || !activeSprite) return;
+document
+  .getElementById("sound-upload")
+  .addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file || !activeSprite) return;
 
-  const reader = new FileReader();
-  reader.onload = () => {
-    let baseName = file.name.split(".")[0];
-    let uniqueName = baseName;
-    let counter = 1;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      let dataURL = reader.result;
 
-    const nameExists = (name) =>
-      activeSprite.sounds.some((s) => s.name === name);
+      dataURL = await compressAudio(dataURL);
 
-    while (nameExists(uniqueName)) {
-      counter++;
-      uniqueName = `${baseName}_${counter}`;
-    }
+      let baseName = file.name.split(".")[0];
+      let uniqueName = baseName;
+      let counter = 1;
 
-    activeSprite.sounds.push({
-      name: uniqueName,
-      dataURL: reader.result,
-    });
+      const nameExists = (name) =>
+        activeSprite.sounds.some((s) => s.name === name);
 
-    if (currentSocket && currentRoom) {
-      currentSocket.emit("projectUpdate", {
-        roomId: currentRoom,
-        type: "addSound",
-        data: {
-          spriteId: activeSprite.id,
-          name: uniqueName,
-          dataURL: reader.result,
-        },
+      while (nameExists(uniqueName)) {
+        counter++;
+        uniqueName = `${baseName}_${counter}`;
+      }
+
+      activeSprite.sounds.push({
+        name: uniqueName,
+        dataURL,
       });
-    }
 
-    if (document.getElementById("sounds-tab").classList.contains("active")) {
-      renderSoundsList();
-    }
-  };
-  reader.readAsDataURL(file);
-  e.target.value = "";
-});
+      if (currentSocket && currentRoom) {
+        currentSocket.emit("projectUpdate", {
+          roomId: currentRoom,
+          type: "addSound",
+          data: {
+            spriteId: activeSprite.id,
+            name: uniqueName,
+            dataURL,
+          },
+        });
+      }
+
+      if (document.getElementById("sounds-tab").classList.contains("active")) {
+        renderSoundsList();
+      }
+    };
+
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  });
 
 window.addEventListener("resize", () => {
   resizeCanvas();
@@ -1688,6 +1721,7 @@ function createSession() {
         data: await getProject(),
       });
     }
+    updateUsersList();
   });
 
   currentSocket.on("projectData", async (data) => {
@@ -1698,7 +1732,7 @@ function createSession() {
   currentSocket.on("projectUpdate", ({ type, data }) => {
     switch (type) {
       case "addVariable": {
-        window.projectVariables[data] = 0;
+        projectVariables[data] = 0;
         break;
       }
       case "addSprite": {
@@ -1763,18 +1797,40 @@ function createSession() {
     }
   });
 
-  currentSocket.on("blocklyUpdate", ({ spriteId, xml }) => {
-    const targetSprite = sprites.find((s) => s.id === spriteId);
-    if (!targetSprite) return;
-    targetSprite.code = xml;
+  currentSocket.on("blocklyUpdate", ({ spriteId, event, from }) => {
+    if (from === currentSocket.id) return;
 
-    if (spriteId === activeSprite.id) {
-      Blockly.Events.disable();
+    const sprite = sprites.find((s) => s.id === spriteId);
+    if (!sprite) return;
 
-      const xmlDom = Blockly.utils.xml.textToDom(xml);
-      Blockly.Xml.clearWorkspaceAndLoadFromXml(xmlDom, workspace);
+    let _workspace,
+      temp = false;
 
-      Blockly.Events.enable();
+    if (activeSprite.id === spriteId) {
+      _workspace = workspace;
+    } else {
+      temp = true;
+      _workspace = new Blockly.Workspace();
+
+      const xml = Blockly.utils.xml.textToDom(sprite.code || "<xml></xml>");
+      Blockly.Xml.domToWorkspace(xml, _workspace);
+    }
+
+    Blockly.Events.disable();
+    try {
+      Blockly.Events.fromJson(event, _workspace).run(true);
+    } catch (err) {
+      console.error("blockly update error:", err);
+    }
+    Blockly.Events.enable();
+
+    if (temp) {
+      const newXml = Blockly.Xml.domToText(
+        Blockly.Xml.workspaceToDom(_workspace)
+      );
+      sprite.code = newXml;
+
+      _workspace.dispose();
     }
   });
 
@@ -1979,25 +2035,50 @@ const ignoredEvents = new Set([
   Blockly.Events.TOOLBOX_ITEM_SELECT,
   Blockly.Events.TRASHCAN_OPEN,
   Blockly.Events.FINISHED_LOADING,
-  Blockly.Events.BLOCK_MOVE,
   Blockly.Events.BLOCK_FIELD_INTERMEDIATE_CHANGE,
   Blockly.Events.THEME_CHANGE,
   Blockly.Events.BUBBLE_OPEN,
   "backpack_change",
 ]);
 
-workspace.addChangeListener((event) => {
-  if (event.type === Blockly.Events.BLOCK_DRAG && event.isStart) return;
-  if (activeSprite && !ignoredEvents.has(event.type)) {
-    activeSprite.code = serializeWorkspace(workspace);
+function sanitizeEvent(event) {
+  const raw = event.toJson();
 
-    if (currentSocket && currentRoom) {
-      currentSocket.emit("blocklyUpdate", {
-        roomId: currentRoom,
-        spriteId: activeSprite.id,
-        xml: activeSprite.code,
-      });
-    }
+  if (event.type === Blockly.Events.BLOCK_DRAG) {
+    return {
+      type: raw.type,
+      blockId: raw.blockId,
+      oldCoordinate: raw.oldCoordinate || null,
+      newCoordinate: raw.newCoordinate || null,
+    };
+  }
+
+  delete raw.workspaceId;
+  delete raw.recordUndo;
+
+  return JSON.parse(JSON.stringify(raw));
+}
+
+workspace.addChangeListener((event) => {
+  if (
+    !activeSprite ||
+    ignoredEvents.has(event.type) ||
+    (event.type === Blockly.Events.BLOCK_DRAG && event.isStart)
+  )
+    return;
+
+  activeSprite.code = Blockly.Xml.domToText(
+    Blockly.Xml.workspaceToDom(workspace)
+  );
+
+  if (currentSocket && currentRoom) {
+    const json = sanitizeEvent(event);
+    currentSocket.emit("blocklyUpdate", {
+      roomId: currentRoom,
+      spriteId: activeSprite.id,
+      event: json,
+      from: currentSocket.id,
+    });
   }
 });
 
