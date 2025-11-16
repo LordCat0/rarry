@@ -1721,6 +1721,7 @@ function createSession() {
         data: await getProject(),
       });
     }
+    updateUsersList();
   });
 
   currentSocket.on("projectData", async (data) => {
@@ -1796,18 +1797,40 @@ function createSession() {
     }
   });
 
-  currentSocket.on("blocklyUpdate", ({ spriteId, xml }) => {
-    const targetSprite = sprites.find((s) => s.id === spriteId);
-    if (!targetSprite) return;
-    targetSprite.code = xml;
+  currentSocket.on("blocklyUpdate", ({ spriteId, event, from }) => {
+    if (from === currentSocket.id) return;
 
-    if (spriteId === activeSprite.id) {
-      Blockly.Events.disable();
+    const sprite = sprites.find((s) => s.id === spriteId);
+    if (!sprite) return;
 
-      const xmlDom = Blockly.utils.xml.textToDom(xml);
-      Blockly.Xml.clearWorkspaceAndLoadFromXml(xmlDom, workspace);
+    let _workspace,
+      temp = false;
 
-      Blockly.Events.enable();
+    if (activeSprite.id === spriteId) {
+      _workspace = workspace;
+    } else {
+      temp = true;
+      _workspace = new Blockly.Workspace();
+
+      const xml = Blockly.utils.xml.textToDom(sprite.code || "<xml></xml>");
+      Blockly.Xml.domToWorkspace(xml, _workspace);
+    }
+
+    Blockly.Events.disable();
+    try {
+      Blockly.Events.fromJson(event, _workspace).run(true);
+    } catch (err) {
+      console.error("blockly update error:", err);
+    }
+    Blockly.Events.enable();
+
+    if (temp) {
+      const newXml = Blockly.Xml.domToText(
+        Blockly.Xml.workspaceToDom(_workspace)
+      );
+      sprite.code = newXml;
+
+      _workspace.dispose();
     }
   });
 
@@ -2012,25 +2035,50 @@ const ignoredEvents = new Set([
   Blockly.Events.TOOLBOX_ITEM_SELECT,
   Blockly.Events.TRASHCAN_OPEN,
   Blockly.Events.FINISHED_LOADING,
-  Blockly.Events.BLOCK_MOVE,
   Blockly.Events.BLOCK_FIELD_INTERMEDIATE_CHANGE,
   Blockly.Events.THEME_CHANGE,
   Blockly.Events.BUBBLE_OPEN,
   "backpack_change",
 ]);
 
-workspace.addChangeListener((event) => {
-  if (event.type === Blockly.Events.BLOCK_DRAG && event.isStart) return;
-  if (activeSprite && !ignoredEvents.has(event.type)) {
-    activeSprite.code = serializeWorkspace(workspace);
+function sanitizeEvent(event) {
+  const raw = event.toJson();
 
-    if (currentSocket && currentRoom) {
-      currentSocket.emit("blocklyUpdate", {
-        roomId: currentRoom,
-        spriteId: activeSprite.id,
-        xml: activeSprite.code,
-      });
-    }
+  if (event.type === Blockly.Events.BLOCK_DRAG) {
+    return {
+      type: raw.type,
+      blockId: raw.blockId,
+      oldCoordinate: raw.oldCoordinate || null,
+      newCoordinate: raw.newCoordinate || null,
+    };
+  }
+
+  delete raw.workspaceId;
+  delete raw.recordUndo;
+
+  return JSON.parse(JSON.stringify(raw));
+}
+
+workspace.addChangeListener((event) => {
+  if (
+    !activeSprite ||
+    ignoredEvents.has(event.type) ||
+    (event.type === Blockly.Events.BLOCK_DRAG && event.isStart)
+  )
+    return;
+
+  activeSprite.code = Blockly.Xml.domToText(
+    Blockly.Xml.workspaceToDom(workspace)
+  );
+
+  if (currentSocket && currentRoom) {
+    const json = sanitizeEvent(event);
+    currentSocket.emit("blocklyUpdate", {
+      roomId: currentRoom,
+      spriteId: activeSprite.id,
+      event: json,
+      from: currentSocket.id,
+    });
   }
 });
 
