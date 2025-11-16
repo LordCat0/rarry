@@ -2044,6 +2044,7 @@ const ignoredEvents = new Set([
   Blockly.Events.TRASHCAN_OPEN,
   Blockly.Events.FINISHED_LOADING,
   Blockly.Events.BLOCK_FIELD_INTERMEDIATE_CHANGE,
+  Blockly.Events.BLOCK_DRAG,
   Blockly.Events.THEME_CHANGE,
   Blockly.Events.BUBBLE_OPEN,
   "backpack_change",
@@ -2051,27 +2052,15 @@ const ignoredEvents = new Set([
 
 function sanitizeEvent(event) {
   const raw = event.toJson();
-
-  if (event.type === Blockly.Events.BLOCK_DRAG) {
-    return {
-      type: raw?.type || event.type,
-      blockId: raw.blockId,
-      oldCoordinate: raw.oldCoordinate || null,
-      newCoordinate: raw.newCoordinate || null,
-    };
-  }
-
   delete raw.workspaceId;
   delete raw.recordUndo;
-
   return JSON.parse(JSON.stringify(raw));
 }
 
 workspace.addChangeListener((event) => {
   if (
     !activeSprite ||
-    ignoredEvents.has(event.type) ||
-    (event.type === Blockly.Events.BLOCK_DRAG && event.isStart)
+    ignoredEvents.has(event.type)
   )
     return;
 
