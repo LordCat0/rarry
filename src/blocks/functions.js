@@ -5,9 +5,6 @@ const ARG_BLOCK_TYPE = "FunctionsArgumentBlock";
 
 class CustomChecker extends Blockly.ConnectionChecker {
   canConnect(a, b, isDragging, opt_distance) {
-    const from = a.getSourceBlock();
-    const to = b.getSourceBlock();
-
     if (!isDragging) {
       return super.canConnect(a, b, isDragging, opt_distance);
     }
@@ -43,8 +40,28 @@ class DuplicateOnDrag {
   }
 
   startDrag(e) {
-    const data = this.block.toCopyData();
-    this.copy = Blockly.clipboard.paste(data, this.block.workspace);
+    const ws = this.block.workspace;
+
+    let typeToCreate = this.block.type;
+    if (this.block.argType_ === "statement") {
+      typeToCreate = "functions_statement_argument_block";
+    }
+
+    let data = this.block.toCopyData();
+    if (data?.blockState) {
+      data.blockState.type = typeToCreate;
+    } else {
+      data.blockState = { type: typeToCreate };
+    }
+
+    if (this.block.mutationToDom) {
+      const mutation = this.block.mutationToDom();
+      if (mutation) {
+        data.blockState.extraState = mutation.outerHTML;
+      }
+    }
+
+    this.copy = Blockly.clipboard.paste(data, ws);
     this.baseStrat = new Blockly.dragging.BlockDragStrategy(this.copy);
     this.copy.setDragStrategy(this.baseStrat);
     this.baseStrat.startDrag(e);
@@ -67,14 +84,47 @@ class DuplicateOnDrag {
   }
 }
 
+function typeToBlocklyCheck(type) {
+  return (
+    {
+      string: "String",
+      number: "Number",
+      boolean: "Boolean",
+      array: "Array",
+      object: "Object",
+    }[type] || null
+  );
+}
+
+function findDuplicateArgNames(types, names) {
+  const used = {};
+  const duplicates = [];
+
+  for (let i = 0; i < types.length; i++) {
+    const key = types[i] + ":" + names[i];
+    if (!names[i]) continue;
+
+    if (used[key]) duplicates.push(i);
+    else used[key] = true;
+  }
+  return duplicates;
+}
+
+function isValidIdentifier(name) {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name);
+}
+
 Blockly.Blocks["functions_argument_block"] = {
   init() {
+    if (!this.argType_) this.argType_ = "string";
+    if (!this.argName_) this.argName_ = "arg";
+
     this.setStyle("procedure_blocks");
     this.appendDummyInput().appendField(
-      new Blockly.FieldLabel("string"),
+      new Blockly.FieldLabel(this.argName_),
       "ARG_NAME"
     );
-    this.argType_ = "string";
+
     this.setOutput(true, null);
     this.setMovable(true);
     this.setDeletable(true);
@@ -88,15 +138,31 @@ Blockly.Blocks["functions_argument_block"] = {
 
   mutationToDom: function () {
     const container = Blockly.utils.xml.createElement("mutation");
-    const name = this.getFieldValue("ARG_NAME") || "arg";
-    const type = this.argType_ || "string";
-    container.setAttribute("name", name);
-    container.setAttribute("type", type);
+    container.setAttribute("type", this.argType_ || "string");
+    container.setAttribute("name", this.argName_ || "arg");
     return container;
   },
 
   domToMutation: function (xmlElement) {
+    const type = xmlElement.getAttribute("type") || "string";
     const name = xmlElement.getAttribute("name") || "arg";
+    this.updateType_(type);
+    this.updateName_(name);
+  },
+
+  updateType_: function (type) {
+    this.argType_ = type;
+    if (type === "statement") {
+      this.setOutputShape(3);
+      this.setOutput(true, ARG_BLOCK_TYPE);
+    } else {
+      const outputType = typeToBlocklyCheck(type) || "String";
+      this.setOutput(true, [outputType, ARG_BLOCK_TYPE]);
+    }
+  },
+
+  updateName_: function (name) {
+    this.argName_ = name;
     if (this.getField("ARG_NAME")) {
       this.setFieldValue(name, "ARG_NAME");
     } else {
@@ -105,20 +171,44 @@ Blockly.Blocks["functions_argument_block"] = {
         "ARG_NAME"
       );
     }
+  },
+};
 
-    const type = xmlElement.getAttribute("type") || "String";
-    this.updateType_(type);
+Blockly.Blocks["functions_statement_argument_block"] = {
+  init() {
+    if (!this.argName_) this.argName_ = "arg";
+
+    this.setStyle("procedure_blocks");
+    this.appendDummyInput().appendField(
+      new Blockly.FieldLabel(this.argName_),
+      "ARG_NAME"
+    );
+
+    this.setNextStatement(true, "default");
+    this.setPreviousStatement(true, "default");
   },
 
-  updateType_: function (type) {
-    this.argType_ = type;
+  mutationToDom: function () {
+    const container = Blockly.utils.xml.createElement("mutation");
+    container.setAttribute("name", this.argName_ || "arg");
+    return container;
+  },
 
-    let outputType = "String";
-    if (type === "string") outputType = "String";
-    else if (type === "number") outputType = "Number";
-    else if (type === "boolean") outputType = "Boolean";
+  domToMutation: function (xmlElement) {
+    const name = xmlElement.getAttribute("name") || "arg";
+    this.updateName_(name);
+  },
 
-    this.setOutput(true, [outputType, ARG_BLOCK_TYPE]);
+  updateName_: function (name) {
+    this.argName_ = name;
+    if (this.getField("ARG_NAME")) {
+      this.setFieldValue(name, "ARG_NAME");
+    } else {
+      this.appendDummyInput().appendField(
+        new Blockly.FieldLabel(name),
+        "ARG_NAME"
+      );
+    }
   },
 };
 
@@ -128,18 +218,23 @@ Blockly.Blocks["functions_definition"] = {
     this.setTooltip("Function definition with a variable number of inputs.");
     this.setInputsInline(true);
 
+    this.functionId_ = Blockly.utils.idGenerator.genUid();
     this.itemCount_ = 0;
     this.argTypes_ = [];
     this.argNames_ = [];
+    this.blockShape_ = "statement";
 
     this.updateShape_();
     this.setMutator(
       new Blockly.icons.MutatorIcon(
         [
+          "functions_args_label",
           "functions_args_string",
           "functions_args_number",
           "functions_args_boolean",
-          "functions_args_label",
+          "functions_args_array",
+          "functions_args_object",
+          "functions_args_statement",
         ],
         this
       )
@@ -148,15 +243,14 @@ Blockly.Blocks["functions_definition"] = {
 
   mutationToDom: function () {
     const container = Blockly.utils.xml.createElement("mutation");
+    container.setAttribute("functionId", this.functionId_);
     container.setAttribute("items", String(this.itemCount_));
+    container.setAttribute("shape", this.blockShape_ || "statement");
 
     for (let i = 0; i < this.itemCount_; i++) {
       const item = Blockly.utils.xml.createElement("item");
-      item.setAttribute("type", this.argTypes_[i] || "arg");
-      item.setAttribute(
-        "name",
-        this.argNames_[i] || (this.argTypes_[i] === "label" ? "text" : "arg")
-      );
+      item.setAttribute("type", this.argTypes_[i]);
+      item.setAttribute("name", this.argNames_[i]);
       container.appendChild(item);
     }
 
@@ -173,32 +267,117 @@ Blockly.Blocks["functions_definition"] = {
       (n) => n.tagName.toLowerCase() === "item"
     );
     for (let i = 0; i < children.length; i++) {
-      const t = children[i].getAttribute("type") || "arg";
-      const n =
-        children[i].getAttribute("name") || (t === "label" ? "text" : "arg");
-      this.argTypes_[i] = t;
-      this.argNames_[i] = n;
+      this.argTypes_[i] = children[i].getAttribute("type");
+      this.argNames_[i] = children[i].getAttribute("name");
     }
 
-    while (this.argTypes_.length < this.itemCount_) this.argTypes_.push("arg");
-    while (this.argNames_.length < this.itemCount_) this.argNames_.push("arg");
+    while (this.argTypes_.length < this.itemCount_)
+      this.argTypes_.push("label");
+    while (this.argNames_.length < this.itemCount_) this.argNames_.push("text");
 
+    this.functionId_ =
+      xmlElement.getAttribute("functionId") ||
+      Blockly.utils.idGenerator.genUid();
+    this.blockShape_ = xmlElement.getAttribute("shape") || "statement";
     this.updateShape_();
   },
 
   saveExtraState: function () {
     return {
+      functionId: this.functionId_,
       itemCount: this.itemCount_,
       argTypes: this.argTypes_,
       argNames: this.argNames_,
+      shape: this.blockShape_,
     };
   },
 
   loadExtraState: function (state) {
+    this.functionId_ = state.functionId || Blockly.utils.idGenerator.genUid();
     this.itemCount_ = state.itemCount || 0;
     this.argTypes_ = state.argTypes || [];
     this.argNames_ = state.argNames || [];
+    this.blockShape_ = state.shape || "statement";
     this.updateShape_();
+  },
+
+  createDefaultArgBlock_: function (type, name = "arg") {
+    Blockly.Events.disable();
+
+    let block;
+    try {
+      const ws = this.workspace;
+      block = ws.newBlock("functions_argument_block");
+      block.setShadow(true);
+      block.setEditable(false);
+      block.updateType_(type);
+      block.updateName_(name);
+
+      if (ws?.rendered) {
+        block.initSvg();
+        block.render();
+      }
+    } catch (_) {}
+
+    Blockly.Events.enable();
+    return block;
+  },
+
+  updateShape_: function () {
+    let savedBody = null;
+
+    const bodyInput = this.getInput("BODY");
+    if (bodyInput && bodyInput.connection?.targetConnection) {
+      savedBody = bodyInput.connection.targetConnection;
+    }
+
+    if (bodyInput) this.removeInput("BODY");
+    if (this.getInput("EMPTY")) this.removeInput("EMPTY");
+    if (this.getInput("SHAPE")) this.removeInput("SHAPE");
+
+    this.inputList.slice().forEach((input) => {
+      const connection = input.connection?.targetConnection;
+      if (connection) connection.getSourceBlock()?.dispose(false);
+      this.removeInput(input.name);
+    });
+
+    let firstArgAdded = this.argTypes_[0] === "label";
+
+    for (let i = 0; i < this.itemCount_; i++) {
+      const type = this.argTypes_[i];
+      const name = this.argNames_[i];
+
+      if (type === "label") {
+        this.appendDummyInput().appendField(new Blockly.FieldLabel(name));
+      } else {
+        const input = this.appendValueInput(name).setCheck(
+          typeToBlocklyCheck(type)
+        );
+
+        if (!firstArgAdded) {
+          input.appendField("my block with");
+          firstArgAdded = true;
+        }
+
+        const reporter = this.createDefaultArgBlock_(type, name);
+        reporter.setFieldValue(name, "ARG_NAME");
+
+        try {
+          reporter.outputConnection.connect(input.connection);
+        } catch (e) {}
+      }
+    }
+
+    if (this.itemCount_ === 0) {
+      this.appendDummyInput("EMPTY").appendField("my block");
+    }
+
+    const newBody = this.appendStatementInput("BODY").setCheck("default");
+    if (savedBody) {
+      try {
+        newBody.connection.connect(savedBody);
+      } catch (e) {}
+    }
   },
 
   decompose: function (workspace) {
@@ -207,34 +386,22 @@ Blockly.Blocks["functions_definition"] = {
     let connection = containerBlock.getInput("STACK").connection;
 
     for (let i = 0; i < this.itemCount_; i++) {
-      const type = this.argTypes_[i] || "arg";
-      const itemBlock = workspace.newBlock(
-        type === "label"
-          ? "functions_args_label"
-          : type === "number"
-          ? "functions_args_number"
-          : type === "boolean"
-          ? "functions_args_boolean"
-          : "functions_args_string"
-      );
+      const type = this.argTypes_[i] || "string";
+      const itemBlock = workspace.newBlock("functions_args_" + type);
       if (workspace.rendered) itemBlock.initSvg();
 
-      if (type === "string" || type === "arg") {
-        itemBlock.setFieldValue(this.argNames_[i] || "arg", "ARG_NAME");
-        itemBlock.valueConnection_ = null;
-      } else if (type === "number") {
-        itemBlock.setFieldValue(this.argNames_[i] || "num", "ARG_NAME");
-        itemBlock.valueConnection_ = null;
-      } else if (type === "boolean") {
-        itemBlock.setFieldValue(this.argNames_[i] || "bool", "ARG_NAME");
-        itemBlock.valueConnection_ = null;
-      } else {
-        itemBlock.setFieldValue(this.argNames_[i] || "text", "LABEL_TEXT");
-      }
+      itemBlock.setFieldValue(
+        this.argNames_[i],
+        type === "label" ? "LABEL_TEXT" : "ARG_NAME"
+      );
+      itemBlock.valueConnection_ = null;
 
       connection.connect(itemBlock.previousConnection);
       connection = itemBlock.nextConnection;
     }
+
+    containerBlock.setFieldValue(this.blockShape_, "SHAPEMENU");
+
     return containerBlock;
   },
 
@@ -245,40 +412,59 @@ Blockly.Blocks["functions_definition"] = {
     let itemBlock = containerBlock.getInputTargetBlock("STACK");
     while (itemBlock) {
       if (!(itemBlock.isInsertionMarker && itemBlock.isInsertionMarker())) {
-        if (itemBlock.type === "functions_args_string") {
-          newTypes.push("string");
-          newNames.push(itemBlock.getFieldValue("ARG_NAME"));
-        } else if (itemBlock.type === "functions_args_number") {
-          newTypes.push("number");
-          newNames.push(itemBlock.getFieldValue("ARG_NAME"));
-        } else if (itemBlock.type === "functions_args_boolean") {
-          newTypes.push("boolean");
-          newNames.push(itemBlock.getFieldValue("ARG_NAME"));
-        } else if (itemBlock.type === "functions_args_label") {
-          newTypes.push("label");
-          newNames.push(itemBlock.getFieldValue("LABEL_TEXT"));
-        }
+        const type = itemBlock.type.slice(15);
+        const name = itemBlock.getFieldValue(
+          type === "label" ? "LABEL_TEXT" : "ARG_NAME"
+        );
+
+        newTypes.push(type);
+        newNames.push(name);
       }
       itemBlock = itemBlock.getNextBlock();
     }
 
-    for (let i = this.itemCount_ - 1; i >= 0; i--) {
-      const inputName = this.argTypes_[i] !== "label" ? "ARG" + i : "LABEL" + i;
-      const input = this.getInput(inputName);
-      if (input) {
-        const conn = input.connection && input.connection.targetConnection;
-        if (conn) {
-          conn.disconnect();
-          const block = conn.getSourceBlock();
-          if (block) block.dispose(false);
+    const dups = findDuplicateArgNames(newTypes, newNames);
+
+    const invalid = [];
+    for (let i = 0; i < newTypes.length; i++) {
+      const type = newTypes[i];
+      const name = newNames[i];
+      if (type !== "label") {
+        if (!isValidIdentifier(name)) {
+          invalid.push(i);
         }
-        this.removeInput(inputName);
       }
     }
+    // -----------------------------------
+
+    itemBlock = containerBlock.getInputTargetBlock("STACK");
+    let index = 0;
+    while (itemBlock) {
+      if (!(itemBlock.isInsertionMarker && itemBlock.isInsertionMarker())) {
+        if (dups.includes(index)) {
+          itemBlock.setWarningText(
+            "This argument name is already used for this type."
+          );
+        } else if (invalid.includes(index)) {
+          itemBlock.setWarningText("This argument name is not a valid.");
+        } else {
+          itemBlock.setWarningText(null);
+        }
+
+        index++;
+      }
+      itemBlock = itemBlock.getNextBlock();
+    }
+
+    const newBlockShape =
+      containerBlock.getFieldValue("SHAPEMENU") || "statement";
+
+    if (dups.length > 0 || invalid.length > 0) return;
 
     this.itemCount_ = newTypes.length;
-    this.argTypes_ = newTypes.slice();
-    this.argNames_ = newNames.slice();
+    this.argTypes_ = newTypes;
+    this.argNames_ = newNames;
+    this.blockShape_ = newBlockShape;
 
     this.updateShape_();
   },
@@ -288,94 +474,13 @@ Blockly.Blocks["functions_definition"] = {
     let i = 0;
     while (itemBlock) {
       if (!(itemBlock.isInsertionMarker && itemBlock.isInsertionMarker())) {
-        if (itemBlock.type !== "functions_args_label") {
-          const input = this.getInput("ARG" + i);
-          itemBlock.valueConnection_ =
-            input && input.connection && input.connection.targetConnection;
-        } else {
-          itemBlock.valueConnection_ = null;
-        }
+        const key = this.argTypes_[i] + "_" + this.argNames_[i];
+        const input = this.getInput(key);
+        itemBlock.valueConnection_ =
+          input && input.connection && input.connection.targetConnection;
         i++;
       }
       itemBlock = itemBlock.getNextBlock();
-    }
-  },
-
-  getInputForTypeIndex_: function (index) {
-    return this.getInput("ARG" + index) || this.getInput("LABEL" + index);
-  },
-
-  createDefaultArgBlock_: function (outputType) {
-    const ws = this.workspace;
-    if (!ws) return null;
-
-    const block = ws.newBlock("functions_argument_block");
-    block.setShadow(true);
-    block.setEditable(false);
-    block.updateType_(outputType);
-
-    if (ws.rendered) {
-      block.initSvg();
-      block.render();
-    }
-
-    return block;
-  },
-
-  updateShape_: function () {
-    let savedBodyConnection = null;
-    const bodyInput = this.getInput("BODY");
-    if (bodyInput && bodyInput.connection?.targetConnection) {
-      savedBodyConnection = bodyInput.connection.targetConnection;
-    }
-
-    if (bodyInput) this.removeInput("BODY");
-    if (this.getInput("EMPTY")) this.removeInput("EMPTY");
-
-    this.inputList.slice().forEach((input) => {
-      if (input.name?.startsWith("ARG") || input.name?.startsWith("LABEL")) {
-        const conn = input.connection?.targetConnection;
-        if (conn) conn.getSourceBlock()?.dispose(false);
-        this.removeInput(input.name);
-      }
-    });
-
-    let firstArgAdded = this.argTypes_[0] === "label";
-    for (let j = 0; j < this.itemCount_; j++) {
-      const type = this.argTypes_[j] || "arg";
-      const name = this.argNames_[j] || (type === "label" ? "text" : "arg");
-
-      if (type === "label") {
-        this.appendDummyInput("LABEL" + j).appendField(
-          new Blockly.FieldLabel(name)
-        );
-      } else {
-        const input = this.appendValueInput("ARG" + j)
-          .setCheck(ARG_BLOCK_TYPE)
-          .setAlign(Blockly.inputs.Align.RIGHT);
-
-        if (!firstArgAdded) {
-          input.appendField("my block with");
-          firstArgAdded = true;
-        }
-
-        const reporter = this.createDefaultArgBlock_(type);
-        reporter.setFieldValue(name, "ARG_NAME");
-        try {
-          reporter.outputConnection.connect(input.connection);
-        } catch (e) {}
-      }
-    }
-
-    if (this.itemCount_ === 0 && !this.getInput("EMPTY")) {
-      this.appendDummyInput("EMPTY").appendField("my block");
-    }
-
-    const newBody = this.appendStatementInput("BODY").setCheck("default");
-    if (savedBodyConnection) {
-      try {
-        savedBodyConnection.connect(newBody.connection);
-      } catch (e) {}
     }
   },
 };
@@ -385,6 +490,31 @@ Blockly.Blocks["functions_args_container"] = {
     this.setStyle("procedure_blocks");
     this.appendDummyInput().appendField("arguments");
     this.appendStatementInput("STACK");
+    this.appendDummyInput()
+      .appendField("shape")
+      .appendField(
+        new Blockly.FieldDropdown([
+          [
+            {
+              src: "icons/statement.svg",
+              width: 98 * 0.6,
+              height: 57 * 0.6,
+              alt: "A block with top and bottom connections",
+            },
+            "statement",
+          ],
+          [
+            {
+              src: "icons/terminal.svg",
+              width: 98 * 0.6,
+              height: 48 * 0.6,
+              alt: "A block with only a top connection",
+            },
+            "terminal",
+          ],
+        ]),
+        "SHAPEMENU"
+      );
     this.contextMenu = false;
   },
 };
@@ -428,6 +558,45 @@ Blockly.Blocks["functions_args_boolean"] = {
   },
 };
 
+Blockly.Blocks["functions_args_array"] = {
+  init: function () {
+    this.setStyle("procedure_blocks");
+    this.appendDummyInput()
+      .appendField("list argument")
+      .appendField(new Blockly.FieldTextInput("arr"), "ARG_NAME");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.contextMenu = false;
+    this.valueConnection_ = null;
+  },
+};
+
+Blockly.Blocks["functions_args_object"] = {
+  init: function () {
+    this.setStyle("procedure_blocks");
+    this.appendDummyInput()
+      .appendField("object argument")
+      .appendField(new Blockly.FieldTextInput("obj"), "ARG_NAME");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.contextMenu = false;
+    this.valueConnection_ = null;
+  },
+};
+
+Blockly.Blocks["functions_args_statement"] = {
+  init: function () {
+    this.setStyle("procedure_blocks");
+    this.appendDummyInput()
+      .appendField("statement argument")
+      .appendField(new Blockly.FieldTextInput("code"), "ARG_NAME");
+    this.setPreviousStatement(true);
+    this.setNextStatement(true);
+    this.contextMenu = false;
+    this.valueConnection_ = null;
+  },
+};
+
 Blockly.Blocks["functions_args_label"] = {
   init: function () {
     this.setStyle("procedure_blocks");
@@ -437,6 +606,7 @@ Blockly.Blocks["functions_args_label"] = {
     this.setPreviousStatement(true);
     this.setNextStatement(true);
     this.contextMenu = false;
+    this.valueConnection_ = null;
   },
 };
 
@@ -445,20 +615,21 @@ Blockly.Blocks["functions_call"] = {
     this.setStyle("procedure_blocks");
     this.setInputsInline(true);
 
-    this.definitionId_ = null;
+    this.functionId_ = null;
+    this.blockShape_ = null;
     this.argTypes_ = [];
     this.argNames_ = [];
+    this.previousArgTypes_ = [];
+    this.previousArgNames_ = [];
 
     this.updateShape_();
-    this.setPreviousStatement(true);
-    this.setNextStatement(true);
   },
 
   mutationToDom: function () {
     const container = Blockly.utils.xml.createElement("mutation");
-    if (this.definitionId_)
-      container.setAttribute("definitionId", this.definitionId_);
+    container.setAttribute("functionId", this.functionId_);
     container.setAttribute("items", this.argTypes_.length);
+    container.setAttribute("shape", this.blockShape_ || "statement");
 
     for (let i = 0; i < this.argTypes_.length; i++) {
       const item = Blockly.utils.xml.createElement("item");
@@ -470,72 +641,98 @@ Blockly.Blocks["functions_call"] = {
   },
 
   domToMutation: function (xmlElement) {
-    this.definitionId_ = xmlElement.getAttribute("definitionId");
-    const items = parseInt(xmlElement.getAttribute("items") || "0", 10);
-
+    this.functionId_ = xmlElement.getAttribute("functionId");
+    this.blockShape_ = xmlElement.getAttribute("shape") || "statement";
+    this.previousArgTypes_ = [...this.argTypes_];
+    this.previousArgNames_ = [...this.argNames_];
     this.argTypes_ = [];
     this.argNames_ = [];
+
+    const items = parseInt(xmlElement.getAttribute("items") || "0", 10);
     for (let i = 0; i < items; i++) {
       const item = xmlElement.children[i];
       this.argTypes_[i] = item.getAttribute("type");
       this.argNames_[i] = item.getAttribute("name");
     }
+
     this.updateShape_();
   },
 
   matchDefinition: function (defBlock) {
-    this.definitionId_ = defBlock.id;
-    this.argTypes_ = defBlock.argTypes_.slice();
-    this.argNames_ = defBlock.argNames_.slice();
+    this.functionId_ = defBlock.functionId_;
+    this.previousArgTypes_ = [...this.argTypes_];
+    this.previousArgNames_ = [...this.argNames_];
+    this.argTypes_ = [...defBlock.argTypes_];
+    this.argNames_ = [...defBlock.argNames_];
+    this.blockShape_ = defBlock.blockShape_.slice();
     this.updateShape_();
     if (defBlock.workspace.rendered) this.render();
   },
 
   updateShape_: function () {
     const oldConnections = {};
-    this.inputList.slice().forEach((input) => {
-      if (input.name?.startsWith("ARG")) {
-        if (input.connection && input.connection.targetBlock()) {
-          oldConnections[input.name] = input.connection.targetBlock();
-        }
-        this.removeInput(input.name);
+
+    [...this.inputList].forEach((input) => {
+      if (input.connection && input.connection.targetBlock()) {
+        oldConnections[input.name] = input.connection.targetConnection;
       }
-      if (input.name?.startsWith("LABEL") || input.name === "EMPTY") {
-        this.removeInput(input.name);
-      }
+      this.removeInput(input.name);
     });
 
-    if (this.getInput("EMPTY")) this.removeInput("EMPTY");
+    const shape = this.blockShape_ || "statement";
+    const nextConn = this.nextConnection;
+
+    if (shape === "statement") {
+      this.setPreviousStatement(true, "default");
+      this.setNextStatement(true, "default");
+    } else if (shape === "terminal") {
+      if (nextConn && nextConn.isConnected()) {
+        const blockBelow = nextConn.targetBlock();
+        blockBelow.unplug(true);
+      }
+
+      this.setNextStatement(false);
+      this.setPreviousStatement(true, "default");
+    }
 
     if (!this.argTypes_ || this.argTypes_.length === 0) {
       this.appendDummyInput("EMPTY").appendField("my block");
-    } else {
-      let firstArgAdded = this.argTypes_[0] === "label";
+      return;
+    }
 
-      for (let i = 0; i < this.argTypes_.length; i++) {
-        const type = this.argTypes_[i];
-        const name = this.argNames_[i];
+    let firstLabel = this.argTypes_[0] === "label";
 
-        if (type === "label") {
-          this.appendDummyInput("LABEL" + i).appendField(name);
-        } else {
-          const input = this.appendValueInput("ARG" + i).setCheck(
-            type === "string"
-              ? "String"
-              : type === "number"
-              ? "Number"
-              : type === "boolean"
-              ? "Boolean"
-              : "String"
+    for (let i = 0; i < this.argTypes_.length; i++) {
+      const type = this.argTypes_[i];
+      const name = this.argNames_[i];
+
+      if (!type || !name) continue;
+
+      if (type === "label") {
+        this.appendDummyInput().appendField(name);
+        continue;
+      }
+
+      if (!firstLabel) {
+        this.appendDummyInput().appendField("my block with");
+        firstLabel = true;
+      }
+
+      let input;
+      const key = type + "_" + name;
+      if (type === "statement") {
+        input = this.appendStatementInput(key).setCheck("default");
+      } else {
+        input = this.appendValueInput(key).setCheck(typeToBlocklyCheck(type));
+      }
+
+      if (oldConnections[key]) {
+        try {
+          input.connection.connect(
+            oldConnections[key].targetBlock()?.outputConnection ||
+              oldConnections[key]
           );
-          if (!firstArgAdded) {
-            input.appendField("my block with");
-            firstArgAdded = true;
-          }
-
-          const oldBlock = oldConnections["ARG" + i];
-          if (oldBlock) input.connection.connect(oldBlock.outputConnection);
-        }
+        } catch (e) {}
       }
     }
   },
@@ -544,26 +741,31 @@ Blockly.Blocks["functions_call"] = {
 BlocklyJS.javascriptGenerator.forBlock["functions_argument_block"] = function (
   block
 ) {
-  const name = block.getFieldValue("ARG_NAME") || "arg";
-  return [name, BlocklyJS.Order.ATOMIC];
+  const key = block.argType_ + "_" + block.argName_;
+  return [key, BlocklyJS.Order.NONE];
 };
+
+BlocklyJS.javascriptGenerator.forBlock["functions_statement_argument_block"] =
+  function (block) {
+    const key = "statement_" + block.argName_ + "();\n";
+    return key;
+  };
 
 BlocklyJS.javascriptGenerator.forBlock["functions_definition"] = function (
   block,
   generator
 ) {
-  const args = [];
-  for (let i = 0; i < block.itemCount_; i++) {
-    if (block.argTypes_[i] !== "label") {
-      args.push(block.argNames_[i]);
-    }
-  }
+  const params = block.argTypes_
+    .map((type, i) => {
+      if (type === "label") return null;
+      return block.argTypes_[i] + "_" + block.argNames_[i];
+    })
+    .filter(Boolean);
 
-  const bodyCode = generator.statementToCode(block, "BODY");
-  const code = `MyFunctions[${generator.quote_(block.id)}] = (${args.join(
+  const body = BlocklyJS.javascriptGenerator.statementToCode(block, "BODY");
+  return `MyFunctions[${generator.quote_(block.functionId_)}] = (${params.join(
     ", "
-  )}) => {\n${bodyCode}}\n`;
-  return code;
+  )}) => {\n${body}};\n`;
 };
 
 BlocklyJS.javascriptGenerator.forBlock["functions_call"] = function (
@@ -571,16 +773,25 @@ BlocklyJS.javascriptGenerator.forBlock["functions_call"] = function (
   generator
 ) {
   const args = [];
+  let stmtCode = "";
+
   for (let i = 0; i < block.argTypes_.length; i++) {
-    if (block.argTypes_[i] !== "label") {
-      const argCode =
-        generator.valueToCode(block, "ARG" + i, BlocklyJS.Order.NONE) ||
-        "null";
-      args.push(argCode);
-    }
+    const type = block.argTypes_[i];
+    const name = block.argNames_[i];
+    const key = `${type}_${name}`;
+
+    if (type === "label") continue;
+
+    if (type === "statement")
+      args.push(`() => {${generator.statementToCode(block, key)}}`);
+    else
+      args.push(
+        generator.valueToCode(block, key, BlocklyJS.Order.NONE) || "null"
+      );
   }
 
-  return `MyFunctions[${generator.quote_(this.definitionId_)}](${args.join(
-    ", "
-  )});\n`;
+  return (
+    `MyFunctions[${generator.quote_(block.functionId_)}](${args.join(", ")})` +
+    `;\n${stmtCode}`
+  );
 };

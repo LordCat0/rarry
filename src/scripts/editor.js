@@ -215,7 +215,8 @@ function dynamicFunctionsCategory(workspace) {
     block.setAttribute("type", "functions_call");
 
     const mutation = document.createElement("mutation");
-    mutation.setAttribute("definitionId", defBlock.id);
+    mutation.setAttribute("functionId", defBlock.functionId_);
+    mutation.setAttribute("shape", defBlock.blockShape_);
     mutation.setAttribute("items", defBlock.argTypes_.length);
 
     for (let i = 0; i < defBlock.argTypes_.length; i++) {
@@ -1318,9 +1319,9 @@ const allowedKeys = new Set([
 ]);
 window.addEventListener("keydown", (e) => {
   const key = e.key;
-  if (allowedKeys.has(key)) {
-    keysPressed[key] = true;
-  }
+  if (!allowedKeys.has(key)) return;
+
+  keysPressed[key] = true;
 
   const specificHandlers = eventRegistry.key.get(key);
   if (specificHandlers) {
@@ -1820,16 +1821,24 @@ function createSession() {
       Blockly.Events.fromJson(event, _workspace).run(true);
     } catch (err) {
       console.error("blockly update error:", err, event);
-    }
-    Blockly.Events.enable();
+    } finally {
+      if (
+        event.type === Blockly.Events.BLOCK_CHANGE &&
+        event.element === "mutation"
+      ) {
+        updateAllFunctionCalls(workspace);
+      }
 
-    if (temp) {
-      const newXml = Blockly.Xml.domToText(
-        Blockly.Xml.workspaceToDom(_workspace)
-      );
-      sprite.code = newXml;
+      if (temp) {
+        const newXml = Blockly.Xml.domToText(
+          Blockly.Xml.workspaceToDom(_workspace)
+        );
+        sprite.code = newXml;
 
-      _workspace.dispose();
+        _workspace.dispose();
+      }
+
+      Blockly.Events.enable();
     }
   });
 
@@ -2065,6 +2074,7 @@ workspace.addChangeListener((event) => {
 
   if (currentSocket && currentRoom) {
     const json = sanitizeEvent(event);
+
     currentSocket.emit("blocklyUpdate", {
       roomId: currentRoom,
       spriteId: activeSprite.id,
@@ -2075,7 +2085,7 @@ workspace.addChangeListener((event) => {
 
 workspace.addChangeListener(Blockly.Events.disableOrphans);
 
-class ScratchDragger extends Blockly.dragging.Dragger {
+class TheDragger extends Blockly.dragging.Dragger {
   setDraggable(draggable) {
     this.draggable = draggable;
   }
@@ -2084,7 +2094,7 @@ class ScratchDragger extends Blockly.dragging.Dragger {
 Blockly.registry.register(
   Blockly.registry.Type.BLOCK_DRAGGER,
   Blockly.registry.DEFAULT,
-  ScratchDragger,
+  TheDragger,
   true
 );
 
@@ -2092,28 +2102,31 @@ function updateAllFunctionCalls(workspace) {
   const allBlocks = workspace.getAllBlocks(false);
   const defs = allBlocks.filter((b) => b.type === "functions_definition");
   const defMap = {};
-  defs.forEach((def) => (defMap[def.id] = def));
+  defs.forEach((def) => (defMap[def.functionId_] = def));
 
   const calls = allBlocks.filter((b) => b.type === "functions_call");
 
   Blockly.Events.disable();
   try {
     calls.forEach((callBlock) => {
-      const def = defMap[callBlock.definitionId_];
+      const def = defs.find((d) => d.functionId_ === callBlock.functionId_);
       if (!def) return;
 
-      const oldArgTypes = (callBlock.argTypes_ || []).slice();
-      const oldArgNames = (callBlock.argNames_ || []).slice();
-      const defTypes = def.argTypes_ || [];
-      const defNames = def.argNames_ || [];
+      const oldTypes = callBlock.argTypes_ || [];
+      const oldNames = callBlock.argNames_ || [];
+      const oldShape = callBlock.blockShape_ || "statement";
 
-      if (
-        JSON.stringify(oldArgTypes) !== JSON.stringify(defTypes) ||
-        JSON.stringify(oldArgNames) !== JSON.stringify(defNames)
-      ) {
-        callBlock.argTypes_ = defTypes.slice();
-        callBlock.argNames_ = defNames.slice();
-        callBlock.updateShape_();
+      const newTypes = def.argTypes_ || [];
+      const newNames = def.argNames_ || [];
+      const newShape = def.blockShape_ || "statement";
+
+      const changed =
+        oldShape !== newShape ||
+        JSON.stringify(oldTypes) !== JSON.stringify(newTypes) ||
+        JSON.stringify(oldNames) !== JSON.stringify(newNames);
+
+      if (changed) {
+        callBlock.matchDefinition(def);
       }
     });
   } finally {
