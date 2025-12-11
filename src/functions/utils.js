@@ -98,13 +98,20 @@ export function showPopup({ innerHTML = "", title = "", rows = [] }) {
               >
                 ${item.options
                   .map(
-                    (opt) =>
+                    opt =>
                       `<option value="${opt.value}" ${
                         opt.value === item.value ? "selected" : ""
                       }>${opt.label}</option>`
                   )
                   .join("")}
               </select>`;
+            case "color":
+              return `<input
+    type="color"
+    value="${item.value || "#ffffff"}"
+    class="${item.className || ""}"
+    data-row="${rowIndex}" data-col="${colIndex}"
+  />`;
             default:
               return "";
           }
@@ -118,7 +125,7 @@ export function showPopup({ innerHTML = "", title = "", rows = [] }) {
     <div class="popup-content">
       <header>
         <h2>${title}</h2>
-        <button class="popup-close danger"><i class="fa-solid fa-xmark"></i></button>
+        <button class="popup-close danger"><i class="fa-solid fa-xmark stay"></i></button>
       </header>
       <div class="popup-body">
         ${rowsHTML}
@@ -144,24 +151,23 @@ export function showPopup({ innerHTML = "", title = "", rows = [] }) {
         el.addEventListener("click", () => item.onClick(popup));
       }
       if (item.type === "input" && item.onInput) {
-        el.addEventListener("input", (e) =>
-          item.onInput(e.target.value, popup)
-        );
+        el.addEventListener("input", e => item.onInput(e.target.value, popup));
       }
       if (item.type === "checkbox" && item.onChange) {
-        el.addEventListener("change", (e) =>
+        el.addEventListener("change", e =>
           item.onChange(e.target.checked, popup)
         );
       }
       if (item.type === "textarea" && item.onInput) {
-        el.addEventListener("input", (e) =>
-          item.onInput(e.target.value, popup)
-        );
+        el.addEventListener("input", e => item.onInput(e.target.value, popup));
       }
       if (item.type === "menu" && item.onChange) {
-        el.addEventListener("change", (e) =>
+        el.addEventListener("change", e =>
           item.onChange(e.target.value, popup)
         );
+      }
+      if (item.type === "color" && item.onChange) {
+        el.addEventListener("input", e => item.onChange(e.target.value, popup));
       }
     });
   });
@@ -193,7 +199,7 @@ async function encodeOggWithMediaRecorder(dataURL) {
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
   const base64 = dataURL.split(",")[1];
-  const raw = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const raw = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
   const buffer = await audioCtx.decodeAudioData(raw.buffer);
 
   const src = audioCtx.createBufferSource();
@@ -207,9 +213,9 @@ async function encodeOggWithMediaRecorder(dataURL) {
   });
 
   const chunks = [];
-  recorder.ondataavailable = (e) => chunks.push(e.data);
+  recorder.ondataavailable = e => chunks.push(e.data);
 
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     recorder.onstop = () => {
       const blob = new Blob(chunks, { type: "audio/ogg" });
       const fr = new FileReader();
@@ -239,7 +245,7 @@ export async function compressImage(dataURL) {
   if (!dataURL || typeof dataURL !== "string") return null;
   if (dataURL.startsWith("data:image/webp")) return dataURL;
 
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement("canvas");

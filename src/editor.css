@@ -216,8 +216,7 @@ html.dark #fullscreen-button img {
   margin: 0 5px;
   margin-top: auto;
   background: var(--primary);
-  color: var(--dark);
-  order: 99;
+  order: 9009;
   cursor: pointer;
 }
 

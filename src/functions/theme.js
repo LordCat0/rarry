@@ -7,6 +7,11 @@ import { showPopup } from "./utils";
 const root = document.documentElement;
 const theme = localStorage.getItem("theme") === "dark" ?? false;
 const icons = localStorage.getItem("removeIcons") === "true" ?? false;
+const rarryToolbar =
+  localStorage.getItem("removeRarryToolbar") === "true" ?? false;
+const toolboxPosition =
+  localStorage.getItem("toolboxPosition") || "space-between";
+const headerColor = localStorage.getItem("headerColor") || "";
 
 const blockStyles = {
   logic_blocks: {
@@ -74,24 +79,57 @@ const darkTheme = Blockly.Theme.defineTheme("customDarkTheme", {
 });
 
 export function toggleTheme(dark = theme, workspace) {
+  localStorage.setItem("theme", dark ? "dark" : "light");
+
   if (dark) root.classList.add("dark");
   else root.classList.remove("dark");
-
-  localStorage.setItem("theme", dark ? "dark" : "light");
 
   if (workspace) workspace.setTheme(dark ? darkTheme : lightTheme);
 }
 
 export function toggleIcons(removeIcons = icons) {
+  localStorage.setItem("removeIcons", String(removeIcons));
+
   if (removeIcons) root.classList.add("removeIcons");
   else root.classList.remove("removeIcons");
+}
 
-  localStorage.setItem("removeIcons", String(removeIcons));
+export function toggleRarryToolbar(removeIcon = rarryToolbar) {
+  localStorage.setItem("removeRarryToolbar", String(removeIcon));
+
+  if (removeIcon) root.classList.add("removeRarryToolbar");
+  else root.classList.remove("removeRarryToolbar");
+}
+
+export function setToolboxPosition(pos) {
+  localStorage.setItem("toolboxPosition", pos);
+
+  const header = document.querySelector("header");
+  if (!header) return;
+
+  root.classList.remove("toolbox-left", "toolbox-center", "toolbox-right");
+
+  if (pos === "default") return;
+
+  root.classList.add(`toolbox-${pos}`);
+}
+
+export function setHeaderColor(color) {
+  localStorage.setItem("headerColor", color);
+
+  if (!color) {
+    root.style.removeProperty("--header-color");
+  } else {
+    root.style.setProperty("--header-color", color);
+  }
 }
 
 export function setupThemeButton(workspace) {
   toggleTheme(theme, workspace);
   toggleIcons(icons);
+  toggleRarryToolbar(rarryToolbar);
+  setToolboxPosition(toolboxPosition);
+  setHeaderColor(headerColor);
 
   const themeButton = document.getElementById("theme-button");
   if (themeButton)
@@ -118,9 +156,49 @@ export function setupThemeButton(workspace) {
               type: "checkbox",
               checked:
                 !document.documentElement.classList.contains("removeIcons"),
-              onChange: (checked) => {
+              onChange: checked => {
                 toggleIcons(!checked);
               },
+            },
+          ],
+          [
+            "Show Rarry logo on toolbar:",
+            {
+              type: "checkbox",
+              checked:
+                !document.documentElement.classList.contains(
+                  "removeRarryToolbar"
+                ),
+              onChange: checked => {
+                toggleRarryToolbar(!checked);
+              },
+            },
+          ],
+          [
+            "Toolbar color:",
+            {
+              type: "color",
+              value: localStorage.getItem("headerColor") || "",
+              onChange: value => setHeaderColor(value),
+            },
+            {
+              type: "button",
+              label: "Reset",
+              onClick: () => setHeaderColor(""),
+            },
+          ],
+          [
+            "Toolbar position:",
+            {
+              type: "menu",
+              value: localStorage.getItem("toolboxPosition") || "default",
+              options: [
+                { label: "Space Between (default)", value: "default" },
+                { label: "Left", value: "left" },
+                { label: "Center", value: "center" },
+                { label: "Right", value: "right" },
+              ],
+              onChange: value => setToolboxPosition(value),
             },
           ],
           workspace
@@ -134,7 +212,7 @@ export function setupThemeButton(workspace) {
                     { label: "Thrasos", value: "thrasos" },
                     { label: "Geras", value: "geras" },
                   ],
-                  onChange: (value) => localStorage.setItem("renderer", value),
+                  onChange: value => localStorage.setItem("renderer", value),
                 },
               ]
             : [],
@@ -168,14 +246,14 @@ export function setupUserTag() {
           Authorization: localStorage.getItem("tooken"),
         },
       })
-        .then((response) => {
+        .then(response => {
           if (!response.ok)
             throw new Error(
               "Failed to fetch user data: " + response.statusText
             );
           return response.json();
         })
-        .then((data) => {
+        .then(data => {
           cache.user = data;
           setUserTag(data);
         })

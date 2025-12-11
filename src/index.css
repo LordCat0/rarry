@@ -1,6 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
-:root {
+html {
   --font: "Inter", sans-serif;
   --dark: #2b323b;
   --dark-light: #424c5a;
@@ -12,6 +12,7 @@
   --color2: #e4e5e7;
   --color3: #cbcdcf;
   --color4: #b9bbbd;
+  --header-color: var(--primary);
 }
 
 html.dark {
@@ -25,6 +26,7 @@ html.dark {
   --color2: #2f3741;
   --color3: #3d4552;
   --color4: #464f5e;
+  --header-color: var(--color4);
 }
 
 * {
@@ -62,17 +64,25 @@ div#stage {
 }
 
 header {
-  background-color: var(--primary);
+  background-color: var(--header-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0.3rem 0.5rem;
   z-index: 10;
-  gap: 0.5rem;
+  gap: 1rem;
 }
 
-html.dark header {
-  background-color: var(--color4);
+html.toolbox-left header {
+  justify-content: flex-start;
+}
+
+html.toolbox-center header {
+  justify-content: center;
+}
+
+html.toolbox-right header {
+  justify-content: flex-end;
 }
 
 header h2,
@@ -95,7 +105,8 @@ header div {
   gap: 0.5rem;
 }
 
-.hidden {
+.hidden,
+html.removeRarryToolbar header img.logo {
   display: none !important;
 }
 
@@ -207,7 +218,7 @@ html.dark header button {
   color: var(--color1);
 }
 
-html:not(.removeIcons) button:has(i) {
+html:not(.removeIcons) button:has(i:not(.stay)) {
   padding-left: 0.7rem;
 }
 
@@ -292,6 +303,7 @@ html.removeIcons button i:not(.stay) {
 .popup-close {
   margin-left: auto;
   font-size: 1.2rem;
+  padding: 0.5rem;
 }
 
 .notification-container {
@@ -363,6 +375,17 @@ input[type="checkbox"]:checked::after {
   border: solid #f3f4f6;
   border-width: 0 2px 2px 0;
   transform: translate(-50%, -50%) rotate(45deg);
+}
+
+input[type="color"] {
+  background: none;
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
 }
 
 .userTag {
