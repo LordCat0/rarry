@@ -9,6 +9,10 @@
   overflow: hidden;
 }
 
+html.stageLeft .main {
+  flex-direction: row-reverse;
+}
+
 .left-panel {
   width: 66.66%;
   display: flex;

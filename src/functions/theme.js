@@ -12,6 +12,7 @@ const rarryToolbar =
 const toolboxPosition =
   localStorage.getItem("toolboxPosition") || "space-between";
 const headerColor = localStorage.getItem("headerColor") || "";
+const stageLeft = localStorage.getItem("stageLeft") === "true" ?? false;
 
 const blockStyles = {
   logic_blocks: {
@@ -78,7 +79,7 @@ const darkTheme = Blockly.Theme.defineTheme("customDarkTheme", {
   },
 });
 
-export function toggleTheme(dark = theme, workspace) {
+export function toggleTheme(dark, workspace) {
   localStorage.setItem("theme", dark ? "dark" : "light");
 
   if (dark) root.classList.add("dark");
@@ -87,14 +88,14 @@ export function toggleTheme(dark = theme, workspace) {
   if (workspace) workspace.setTheme(dark ? darkTheme : lightTheme);
 }
 
-export function toggleIcons(removeIcons = icons) {
+export function toggleIcons(removeIcons) {
   localStorage.setItem("removeIcons", String(removeIcons));
 
   if (removeIcons) root.classList.add("removeIcons");
   else root.classList.remove("removeIcons");
 }
 
-export function toggleRarryToolbar(removeIcon = rarryToolbar) {
+export function toggleRarryToolbar(removeIcon) {
   localStorage.setItem("removeRarryToolbar", String(removeIcon));
 
   if (removeIcon) root.classList.add("removeRarryToolbar");
@@ -117,17 +118,22 @@ export function setToolboxPosition(pos) {
 export function setHeaderColor(color) {
   localStorage.setItem("headerColor", color);
 
-  if (!color) {
-    root.style.removeProperty("--header-color");
-  } else {
-    root.style.setProperty("--header-color", color);
-  }
+  if (!color) root.style.removeProperty("--header-color");
+  else root.style.setProperty("--header-color", color);
+}
+
+export function toggleStageLeft(left) {
+  localStorage.setItem("stageLeft", String(left));
+
+  if (left) root.classList.add("stageLeft");
+  else root.classList.remove("stageLeft");
 }
 
 export function setupThemeButton(workspace) {
   toggleTheme(theme, workspace);
   toggleIcons(icons);
   toggleRarryToolbar(rarryToolbar);
+  toggleStageLeft(stageLeft);
   setToolboxPosition(toolboxPosition);
   setHeaderColor(headerColor);
 
@@ -201,21 +207,34 @@ export function setupThemeButton(workspace) {
               onChange: value => setToolboxPosition(value),
             },
           ],
-          workspace
+          ...(workspace
             ? [
-                "Renderer (applies after refresh):",
-                {
-                  type: "menu",
-                  value: localStorage.getItem("renderer"),
-                  options: [
-                    { label: "Zelos (default)", value: "custom_zelos" },
-                    { label: "Thrasos", value: "thrasos" },
-                    { label: "Geras", value: "geras" },
-                  ],
-                  onChange: value => localStorage.setItem("renderer", value),
-                },
+                [
+                  "Renderer (applies after refresh):",
+                  {
+                    type: "menu",
+                    value: localStorage.getItem("renderer"),
+                    options: [
+                      { label: "Zelos (default)", value: "custom_zelos" },
+                      { label: "Thrasos", value: "thrasos" },
+                      { label: "Geras", value: "geras" },
+                    ],
+                    onChange: value => localStorage.setItem("renderer", value),
+                  },
+                ],
+                [
+                  "Stage on left:",
+                  {
+                    type: "checkbox",
+                    checked:
+                      document.documentElement.classList.contains("stageLeft"),
+                    onChange: checked => {
+                      toggleStageLeft(checked);
+                    },
+                  },
+                ],
               ]
-            : [],
+            : []),
         ],
       })
     );
