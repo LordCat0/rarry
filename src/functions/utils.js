@@ -1,3 +1,5 @@
+import * as Blockly from "blockly";
+
 let currentPopup;
 
 export function showNotification({
@@ -9,10 +11,9 @@ export function showNotification({
   notification.className = "notification";
   notification.innerHTML = `
     ${message}
-    ${
-      closable
-        ? '<button class="notification-close"><i class="fa-solid fa-xmark"></i></button>'
-        : ""
+    ${closable
+      ? '<button class="notification-close"><i class="fa-solid fa-xmark"></i></button>'
+      : ""
     }
   `;
 
@@ -41,9 +42,15 @@ export function showNotification({
   return notification;
 }
 
-export function showPopup({ innerHTML = "", title = "", rows = [] }) {
+export function showPopup({
+  innerHTML = "",
+  title = "",
+  rows = [],
+  noAnimation = false,
+}) {
   const popup = document.createElement("div");
   popup.className = "popup";
+  if (noAnimation) popup.classList.add("no-animation");
 
   if (currentPopup) currentPopup.remove();
   currentPopup = popup;
@@ -99,8 +106,7 @@ export function showPopup({ innerHTML = "", title = "", rows = [] }) {
                 ${item.options
                   .map(
                     opt =>
-                      `<option value="${opt.value}" ${
-                        opt.value === item.value ? "selected" : ""
+                      `<option value="${opt.value}" ${opt.value === item.value ? "selected" : ""
                       }>${opt.label}</option>`
                   )
                   .join("")}
@@ -125,7 +131,9 @@ export function showPopup({ innerHTML = "", title = "", rows = [] }) {
     <div class="popup-content">
       <header>
         <h2>${title}</h2>
-        <button class="popup-close danger"><i class="fa-solid fa-xmark stay"></i></button>
+        <button class="popup-close danger">
+          <i class="fa-solid fa-xmark stay"></i>
+        </button>
       </header>
       <div class="popup-body">
         ${rowsHTML}
@@ -258,3 +266,147 @@ export async function compressImage(dataURL) {
     img.src = dataURL;
   });
 }
+
+export class DuplicateOnDragWithType {
+  constructor(block, outputTypes = null) {
+    this.block = block;
+    this.outputTypes = outputTypes;
+  }
+
+  isMovable() {
+    return true;
+  }
+
+  startDrag(e) {
+    const ws = this.block.workspace;
+    const data = this.block.toCopyData();
+
+    data.blockState = {
+      ...(data.blockState ?? {}),
+      type: this.block.type,
+    };
+
+    if (this.block.saveExtraState) {
+      data.blockState.extraState = this.block.saveExtraState();
+    }
+
+    this.copy = Blockly.clipboard.paste(data, ws);
+    this.copy.setShadow(false);
+    if (this.outputTypes && this.copy.outputConnection) {
+      this.copy.setOutput(true, this.outputTypes);
+    }
+    this.baseStrat = new Blockly.dragging.BlockDragStrategy(this.copy);
+    this.copy.setDragStrategy(this.baseStrat);
+    this.baseStrat.startDrag(e);
+  }
+
+  drag(e) {
+    this.block.workspace
+      .getGesture(e)
+      .getCurrentDragger()
+      .setDraggable(this.copy);
+    this.baseStrat.drag(e);
+  }
+
+  endDrag(e) {
+    this.baseStrat?.endDrag(e);
+  }
+
+  revertDrag(e) {
+    this.copy?.dispose();
+  }
+}
+
+export const tweenEasing = {
+  InLinear: (t) => t,
+  OutLinear: (t) => t,
+  InOutLinear: (t) => t,
+  InSine: (t) => 1 - Math.cos((t * Math.PI) / 2),
+  OutSine: (t) => Math.sin((t * Math.PI) / 2),
+  InOutSine: (t) => -(Math.cos(Math.PI * t) - 1) / 2,
+  InQuad: (t) => t * t,
+  OutQuad: (t) => 1 - (1 - t) * (1 - t),
+  InOutQuad: (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
+  InCubic: (t) => t * t * t,
+  OutCubic: (t) => 1 - Math.pow(1 - t, 3),
+  InOutCubic: (t) =>
+    t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+  InQuart: (t) => t * t * t * t,
+  OutQuart: (t) => 1 - Math.pow(1 - t, 4),
+  InOutQuart: (t) =>
+    t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2,
+  InQuint: (t) => t * t * t * t * t,
+  OutQuint: (t) => 1 - Math.pow(1 - t, 5),
+  InOutQuint: (t) =>
+    t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2,
+  InExpo: (t) => (t === 0 ? 0 : Math.pow(2, 10 * t - 10)),
+  OutExpo: (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
+  InOutExpo: (t) => {
+    if (t === 0) return 0;
+    if (t === 1) return 1;
+    return t < 0.5
+      ? Math.pow(2, 20 * t - 10) / 2
+      : (2 - Math.pow(2, -20 * t + 10)) / 2;
+  },
+  InCirc: (t) => 1 - Math.sqrt(1 - Math.pow(t, 2)),
+  OutCirc: (t) => Math.sqrt(1 - Math.pow(t - 1, 2)),
+  InOutCirc: (t) =>
+    t < 0.5
+      ? (1 - Math.sqrt(1 - Math.pow(2 * t, 2))) / 2
+      : (Math.sqrt(1 - Math.pow(-2 * t + 2, 2)) + 1) / 2,
+  InBack: (t) => {
+    const c1 = 1.70158,
+      c3 = c1 + 1;
+    return c3 * t * t * t - c1 * t * t;
+  },
+  OutBack: (t) => {
+    const c1 = 1.70158,
+      c3 = c1 + 1;
+    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+  },
+  InOutBack: (t) => {
+    const c1 = 1.70158,
+      c2 = c1 * 1.525;
+    return t < 0.5
+      ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
+      : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (2 * t - 2) + c2) + 2) / 2;
+  },
+  InElastic: (t) => {
+    const c4 = (2 * Math.PI) / 3;
+    if (t === 0) return 0;
+    if (t === 1) return 1;
+    return -Math.pow(2, 10 * t - 10) * Math.sin((t * 10 - 10.75) * c4);
+  },
+  OutElastic: (t) => {
+    const c4 = (2 * Math.PI) / 3;
+    if (t === 0) return 0;
+    if (t === 1) return 1;
+    return Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+  },
+  InOutElastic: (t) => {
+    const c5 = (2 * Math.PI) / 4.5;
+    if (t === 0) return 0;
+    if (t === 1) return 1;
+    return t < 0.5
+      ? -(Math.pow(2, 20 * t - 10) * Math.sin((20 * t - 11.125) * c5)) / 2
+      : (Math.pow(2, -20 * t + 10) * Math.sin((20 * t - 11.125) * c5)) / 2 + 1;
+  },
+  InBounce: (t) => 1 - tweenEasing.OutBounce(1 - t),
+  OutBounce: (t) => {
+    const n1 = 7.5625,
+      d1 = 2.75;
+    if (t < 1 / d1) {
+      return n1 * t * t;
+    } else if (t < 2 / d1) {
+      return n1 * (t -= 1.5 / d1) * t + 0.75;
+    } else if (t < 2.5 / d1) {
+      return n1 * (t -= 2.25 / d1) * t + 0.9375;
+    } else {
+      return n1 * (t -= 2.625 / d1) * t + 0.984375;
+    }
+  },
+  InOutBounce: (t) =>
+    t < 0.5
+      ? (1 - tweenEasing.OutBounce(1 - 2 * t)) / 2
+      : (1 + tweenEasing.OutBounce(2 * t - 1)) / 2,
+};

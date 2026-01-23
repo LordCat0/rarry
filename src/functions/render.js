@@ -24,7 +24,7 @@ class CustomConstantProvider extends Blockly.zelos.ConstantProvider {
 
       return `
         h ${radiusH * dirR}
-        q ${(h_ / 4) * -dirR} ${radius * dirU} 0 ${h * dirU}
+        q ${((h_ - extra) / 4) * -dirR} ${radius * dirU} 0 ${h * dirU}
         h ${radiusH * -dirR}
       `;
     }
@@ -123,28 +123,30 @@ class CustomConstantProvider extends Blockly.zelos.ConstantProvider {
   makeSpikey() {
     const maxW = this.MAX_DYNAMIC_CONNECTION_SHAPE_WIDTH;
     const maxH = maxW * 2;
+    const roundedCopy = this.ROUNDED;
 
     function makeMainPath(blockHeight, up, right) {
       const extra = blockHeight > maxH ? blockHeight - maxH : 0;
       const h_ = Math.min(blockHeight, maxH);
       const h = h_ + extra;
       const radius = h / 4;
-      const radiusH = Math.min(h_ / 4, maxH);
+      const radiusH = Math.min(h_ / 2, maxH);
       const dirR = right ? 1 : -1;
       const dirU = up ? -1 : 1;
+      const lineWidth = (h_ - extra) / 5;
 
       return `
-        h ${2 * radiusH * dirR}
-        l ${radiusH * -dirR} ${radius * dirU}
-        l ${radiusH * dirR} ${radius * dirU}
-        l ${radiusH * -dirR} ${radius * dirU}
-        l ${radiusH * dirR} ${radius * dirU}
-        h ${2 * radiusH * -dirR}
+        h ${radiusH * dirR}
+        l ${lineWidth * -dirR} ${radius * dirU}
+        l ${lineWidth * dirR} ${radius * dirU}
+        l ${lineWidth * -dirR} ${radius * dirU}
+        l ${lineWidth * dirR} ${radius * dirU}
+        h ${radiusH * -dirR}
       `;
     }
 
     return {
-      type: this.SHAPES.HEXAGONAL,
+      type: this.SHAPES.ROUND,
       isDynamic: true,
       width(h) {
         const half = h / 2;
@@ -166,10 +168,10 @@ class CustomConstantProvider extends Blockly.zelos.ConstantProvider {
         return makeMainPath(h, true, false);
       },
       pathRightDown(h) {
-        return makeMainPath(h, false, true);
+        return roundedCopy.pathRightDown(h);
       },
       pathRightUp(h) {
-        return makeMainPath(h, true, true);
+        return roundedCopy.pathRightUp(h);
       },
     };
   }

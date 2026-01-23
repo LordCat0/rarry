@@ -185,3 +185,26 @@ Blockly.Blocks["controls_stopscript"] = {
 
 BlocklyJS.javascriptGenerator.forBlock["controls_stopscript"] = () =>
   'throw new Error("shouldStop");\n';
+
+
+Blockly.Blocks["controls_stopblock"] = {
+  init: function () {
+    this.appendDummyInput()
+      .appendField("stop")
+      .appendField(
+        new Blockly.FieldDropdown([
+          ["this script", "script"],
+          ["the project", "project"],
+        ]),
+        "MODE"
+      )
+    this.setPreviousStatement(true, "default");
+    this.setStyle("control_blocks");
+  },
+};
+
+BlocklyJS.javascriptGenerator.forBlock["controls_stopblock"] = (block) => {
+  const mode = block.getFieldValue("MODE");
+  if (mode === "script") return 'throw new Error("shouldStop");\n';
+  else if (mode === "project") return 'stopProject();\n';
+}

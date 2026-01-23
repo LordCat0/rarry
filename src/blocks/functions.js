@@ -9,12 +9,13 @@ class CustomChecker extends Blockly.ConnectionChecker {
       return super.canConnect(a, b, isDragging, opt_distance);
     }
 
+    /** @type {Blockly.BlockSvg} */
     const existing = b.targetConnection && b.targetConnection.getSourceBlock();
 
     if (
       existing &&
-      existing.type === "functions_argument_block" &&
-      existing.isShadow()
+      ((existing.type === "functions_argument_block" && existing.isShadow()) ||
+        existing?.outputConnection?.getCheck()?.includes("DuplicateShadowType"))
     ) {
       return false;
     }
@@ -27,10 +28,10 @@ Blockly.registry.register(
   Blockly.registry.Type.CONNECTION_CHECKER,
   "CustomChecker",
   CustomChecker,
-  true
+  true,
 );
 
-class DuplicateOnDrag {
+class FunctionDuplicateOnDrag {
   constructor(block) {
     this.block = block;
   }
@@ -122,7 +123,7 @@ Blockly.Blocks["functions_argument_block"] = {
     this.setStyle("procedure_blocks");
     this.appendDummyInput().appendField(
       new Blockly.FieldLabel(this.argName_),
-      "ARG_NAME"
+      "ARG_NAME",
     );
 
     this.setOutput(true, null);
@@ -131,7 +132,7 @@ Blockly.Blocks["functions_argument_block"] = {
 
     setTimeout(() => {
       if (this.setDragStrategy && this.isShadow()) {
-        this.setDragStrategy(new DuplicateOnDrag(this));
+        this.setDragStrategy(new FunctionDuplicateOnDrag(this));
       }
     });
   },
@@ -168,7 +169,7 @@ Blockly.Blocks["functions_argument_block"] = {
     } else {
       this.appendDummyInput().appendField(
         new Blockly.FieldLabel(name),
-        "ARG_NAME"
+        "ARG_NAME",
       );
     }
   },
@@ -181,7 +182,7 @@ Blockly.Blocks["functions_statement_argument_block"] = {
     this.setStyle("procedure_blocks");
     this.appendDummyInput().appendField(
       new Blockly.FieldLabel(this.argName_),
-      "ARG_NAME"
+      "ARG_NAME",
     );
 
     this.setNextStatement(true, "default");
@@ -206,7 +207,7 @@ Blockly.Blocks["functions_statement_argument_block"] = {
     } else {
       this.appendDummyInput().appendField(
         new Blockly.FieldLabel(name),
-        "ARG_NAME"
+        "ARG_NAME",
       );
     }
   },
@@ -227,7 +228,7 @@ Blockly.Blocks["functions_definition"] = {
 
     this.updateShape_();
     this.setMutator(
-      new Blockly.icons.MutatorIcon(["functions_args_generic"], this)
+      new Blockly.icons.MutatorIcon(["functions_args_generic"], this),
     );
   },
 
@@ -254,7 +255,7 @@ Blockly.Blocks["functions_definition"] = {
     this.argNames_ = [];
 
     const children = [...xmlElement.children].filter(
-      n => n.tagName.toLowerCase() === "item"
+      (n) => n.tagName.toLowerCase() === "item",
     );
     for (let i = 0; i < children.length; i++) {
       this.argTypes_[i] = children[i].getAttribute("type");
@@ -327,7 +328,7 @@ Blockly.Blocks["functions_definition"] = {
     if (this.getInput("EMPTY")) this.removeInput("EMPTY");
     if (this.getInput("SHAPE")) this.removeInput("SHAPE");
 
-    [...this.inputList].forEach(input => {
+    [...this.inputList].forEach((input) => {
       const connection = input.connection?.targetConnection;
       if (connection) connection.getSourceBlock()?.dispose(false);
       this.removeInput(input.name);
@@ -343,7 +344,7 @@ Blockly.Blocks["functions_definition"] = {
         this.appendDummyInput().appendField(new Blockly.FieldLabel(name));
       } else {
         const input = this.appendValueInput(name).setCheck(
-          typeToBlocklyCheck(type)
+          typeToBlocklyCheck(type),
         );
 
         if (!firstArgAdded) {
@@ -429,7 +430,7 @@ Blockly.Blocks["functions_definition"] = {
       if (!(itemBlock.isInsertionMarker && itemBlock.isInsertionMarker())) {
         if (dups.includes(index)) {
           itemBlock.setWarningText(
-            "This argument name is already used for this type."
+            "This argument name is already used for this type.",
           );
         } else if (invalid.includes(index)) {
           itemBlock.setWarningText("This argument name is not a valid.");
@@ -483,8 +484,8 @@ Blockly.Blocks["functions_definition"] = {
         const val = block.getInputTargetBlock("VALUE");
         const checks = val?.outputConnection?.check;
         if (checks !== undefined) {
-          (Array.isArray(checks) ? checks : [checks]).forEach(t =>
-            types.add(t)
+          (Array.isArray(checks) ? checks : [checks]).forEach((t) =>
+            types.add(t),
           );
         }
       }
@@ -526,7 +527,7 @@ Blockly.Blocks["functions_args_container"] = {
             "terminal",
           ],
         ]),
-        "SHAPEMENU"
+        "SHAPEMENU",
       );
     this.contextMenu = false;
   },
@@ -548,7 +549,7 @@ Blockly.Blocks["functions_args_generic"] = {
           ["object", "object"],
           ["statement", "statement"],
         ]),
-        "ARG_TYPE"
+        "ARG_TYPE",
       )
       .appendField(new Blockly.FieldTextInput("arg"), "ARG_NAME");
 
@@ -582,7 +583,7 @@ Blockly.Blocks["functions_call"] = {
     container.setAttribute("shape", this.blockShape_ || "statement");
     container.setAttribute(
       "returntypes",
-      JSON.stringify(this.returnTypes_ || [])
+      JSON.stringify(this.returnTypes_ || []),
     );
 
     for (let i = 0; i < this.argTypes_.length; i++) {
@@ -606,7 +607,7 @@ Blockly.Blocks["functions_call"] = {
     this.returnTypes_;
     try {
       this.returnTypes_ = JSON.parse(
-        xmlElement.getAttribute("returntypes") || "[]"
+        xmlElement.getAttribute("returntypes") || "[]",
       );
     } catch {
       this.returnTypes_ = [];
@@ -638,7 +639,7 @@ Blockly.Blocks["functions_call"] = {
   updateShape_: function () {
     const oldConnections = {};
 
-    [...this.inputList].forEach(input => {
+    [...this.inputList].forEach((input) => {
       if (input.connection && input.connection.targetBlock()) {
         oldConnections[input.name] = input.connection.targetConnection;
       }
@@ -719,7 +720,7 @@ Blockly.Blocks["functions_call"] = {
         try {
           input.connection.connect(
             oldConnections[key].targetBlock()?.outputConnection ||
-              oldConnections[key]
+              oldConnections[key],
           );
         } catch (e) {}
       }
@@ -751,17 +752,17 @@ Blockly.Blocks["functions_return"] = {
   },
 };
 
-BlocklyJS.javascriptGenerator.forBlock["functions_argument_block"] = block => [
-  block.argType_ + "_" + block.argName_,
-  BlocklyJS.Order.NONE,
-];
+BlocklyJS.javascriptGenerator.forBlock["functions_argument_block"] = (
+  block,
+) => [block.argType_ + "_" + block.argName_, BlocklyJS.Order.NONE];
 
-BlocklyJS.javascriptGenerator.forBlock["functions_statement_argument_block"] =
-  block => "statement_" + block.argName_ + "();\n";
+BlocklyJS.javascriptGenerator.forBlock["functions_statement_argument_block"] = (
+  block,
+) => "statement_" + block.argName_ + "();\n";
 
 BlocklyJS.javascriptGenerator.forBlock["functions_definition"] = function (
   block,
-  generator
+  generator,
 ) {
   const params = block.argTypes_
     .map((type, i) => {
@@ -772,13 +773,13 @@ BlocklyJS.javascriptGenerator.forBlock["functions_definition"] = function (
 
   const body = BlocklyJS.javascriptGenerator.statementToCode(block, "BODY");
   return `MyFunctions[${generator.quote_(
-    block.functionId_
+    block.functionId_,
   )}] = async (${params.join(", ")}) => {\n${body}};\n`;
 };
 
 BlocklyJS.javascriptGenerator.forBlock["functions_call"] = function (
   block,
-  generator
+  generator,
 ) {
   const args = [];
 
@@ -793,18 +794,18 @@ BlocklyJS.javascriptGenerator.forBlock["functions_call"] = function (
       args.push(`async () => {${generator.statementToCode(block, key)}}`);
     else
       args.push(
-        generator.valueToCode(block, key, BlocklyJS.Order.NONE) || "null"
+        generator.valueToCode(block, key, BlocklyJS.Order.NONE) || "null",
       );
   }
 
   return `await MyFunctions[${generator.quote_(block.functionId_)}](${args.join(
-    ", "
+    ", ",
   )});\n`;
 };
 
 BlocklyJS.javascriptGenerator.forBlock["functions_return"] = function (
   block,
-  generator
+  generator,
 ) {
   const value = generator.valueToCode(block, "VALUE", BlocklyJS.Order.NONE);
   return `return ${value || "null"};\n`;

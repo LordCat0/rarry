@@ -1,7 +1,8 @@
 import * as PIXI from "pixi.js-legacy";
 import { calculateBubblePosition, projectVariables } from "../scripts/editor";
 import { Thread } from "./threads";
-import { promiseWithAbort } from "./utils";
+import { promiseWithAbort, tweenEasing } from "./utils";
+import { extensions } from "./extensionManager";
 
 const BUBBLE_PADDING = 10;
 const BUBBLE_TAIL_HEIGHT = 15;
@@ -23,6 +24,7 @@ export function runCodeWithFunctions({
   signal,
   penGraphics,
   activeEventThreads,
+  abort
 }) {
   Thread.resetAll();
   let fastExecution = false;
@@ -34,12 +36,13 @@ export function runCodeWithFunctions({
     (spriteData.costumes || []).map((c) => [c.name, c])
   );
   const soundMap = new Map((spriteData.sounds || []).map((s) => [s.name, s]));
-  const extensions = window.extensions;
   const MyFunctions = {};
 
   function stopped() {
     return signal.aborted === true;
   }
+
+  const stopProject = abort;
 
   function registerEvent(type, key, callback) {
     if (stopped()) return;
@@ -286,7 +289,7 @@ export function runCodeWithFunctions({
     const tweenPromise = new Promise((resolve) => {
       const start = performance.now();
       const change = to - from;
-      const easeFn = window.TweenEasing[easing] || window.TweenEasing.linear;
+      const easeFn = tweenEasing[easing] || tweenEasing.linear;
 
       function tick(now) {
         if (stopped()) return resolve("shouldStop");
@@ -419,8 +422,8 @@ export function runCodeWithFunctions({
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(value);
     spriteData.penColor = result
       ? (parseInt(result[1], 16) << 16) |
-        (parseInt(result[2], 16) << 8) |
-        parseInt(result[3], 16)
+      (parseInt(result[2], 16) << 8) |
+      parseInt(result[3], 16)
       : 0x000000;
   }
 
@@ -436,6 +439,8 @@ export function runCodeWithFunctions({
     sprite.visible = bool;
     if (spriteData.currentBubble) spriteData.currentBubble.visible = bool;
   }
-  
+
+  console.log(code)
+
   eval(code);
 }

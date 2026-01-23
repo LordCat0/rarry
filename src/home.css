@@ -3,7 +3,7 @@
   flex-direction: column;
   gap: 1.5rem;
   padding: 3rem;
-  background-image: url("/icons/blur.png");
+  background-image: url("/icons/home/blur.png");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -30,12 +30,12 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  text-shadow: none;
   gap: 0.5rem;
-  padding: 2rem;
+  padding: 1.5rem;
   border-radius: 1rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   max-width: 15rem;
-  text-shadow: none;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -51,6 +51,18 @@
 .feature-card p {
   color: var(--dark-light);
   font-size: 0.95rem;
+}
+
+.feature-card img {
+  max-width: 5rem;
+  max-height: 5rem;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  transition: scale 0.3s ease;
+}
+
+.feature-card:hover img {
+  scale: 1.2;
 }
 
 .cta-section {

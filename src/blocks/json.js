@@ -2,6 +2,47 @@ import * as Blockly from "blockly";
 import * as BlocklyJS from "blockly/javascript";
 const xmlUtils = Blockly.utils.xml;
 
+Blockly.Blocks["json_length"] = {
+  init: function () {
+    this.appendValueInput("OBJECT").setCheck("Object").appendField("length of");
+    this.setOutput(true, "Number");
+    this.setInputsInline(true);
+    this.setStyle("json_category");
+    this.setTooltip("Returns the length of an object.");
+  },
+};
+
+BlocklyJS.javascriptGenerator.forBlock["json_length"] = function (block) {
+  const obj =
+    BlocklyJS.javascriptGenerator.valueToCode(
+      block,
+      "OBJECT",
+      BlocklyJS.Order.NONE
+    ) || "{}";
+  return [`Object.keys(${obj}).length`, BlocklyJS.Order.MEMBER];
+};
+
+Blockly.Blocks["json_isEmpty"] = {
+  init: function () {
+    this.appendValueInput("OBJECT").setCheck("Object");
+    this.appendDummyInput().appendField("is empty")
+    this.setOutput(true, "Boolean");
+    this.setInputsInline(true);
+    this.setStyle("json_category");
+    this.setTooltip("Returns true if the object is empty.");
+  },
+};
+
+BlocklyJS.javascriptGenerator.forBlock["json_isEmpty"] = function (block) {
+  const obj =
+    BlocklyJS.javascriptGenerator.valueToCode(
+      block,
+      "OBJECT",
+      BlocklyJS.Order.NONE
+    ) || "{}";
+  return [`Object.keys(${obj}).length === 0`, BlocklyJS.Order.EQUALITY];
+};
+
 Blockly.Blocks["json_get"] = {
   init: function () {
     this.appendValueInput("KEY").setCheck("String").appendField("value of");
@@ -9,7 +50,7 @@ Blockly.Blocks["json_get"] = {
     this.setOutput(true);
     this.setInputsInline(true);
     this.setStyle("json_category");
-    this.setTooltip("Returns the value of a key from a JSON object.");
+    this.setTooltip("Returns the value of a key from an object.");
   },
 };
 
@@ -29,6 +70,7 @@ BlocklyJS.javascriptGenerator.forBlock["json_get"] = function (block) {
   return [`${obj}[${key}]`, BlocklyJS.Order.MEMBER];
 };
 
+/* --- start deprecated */
 Blockly.Blocks["json_set"] = {
   init: function () {
     this.appendValueInput("OBJECT").setCheck("Object").appendField("in object");
@@ -38,7 +80,7 @@ Blockly.Blocks["json_set"] = {
     this.setNextStatement(true, "default");
     this.setInputsInline(true);
     this.setStyle("json_category");
-    this.setTooltip("Sets a value to a key in a JSON object.");
+    this.setTooltip("Sets a value to a key in an object.");
   },
 };
 
@@ -72,7 +114,7 @@ Blockly.Blocks["json_delete"] = {
     this.setNextStatement(true);
     this.setInputsInline(true);
     this.setStyle("json_category");
-    this.setTooltip("Deletes a key from a JSON object.");
+    this.setTooltip("Deletes a key from an object.");
   },
 };
 
@@ -90,6 +132,75 @@ BlocklyJS.javascriptGenerator.forBlock["json_delete"] = function (block) {
       BlocklyJS.Order.NONE
     ) || '""';
   return `delete ${obj}[${key}];\n`;
+};
+/* --- end deprecated --- */
+
+Blockly.Blocks["json_set_return"] = {
+  init: function () {
+    this.appendValueInput("OBJECT").setCheck("Object").appendField("in object");
+    this.appendValueInput("KEY").setCheck("String").appendField("set");
+    this.appendValueInput("VALUE").appendField("to");
+    this.setInputsInline(true);
+    this.setOutput(true, "Object");
+    this.setStyle("json_category");
+    this.setTooltip("Sets a value to a key in an object and returns the object.");
+  },
+};
+
+BlocklyJS.javascriptGenerator.forBlock["json_set_return"] = function (block) {
+  const obj =
+    BlocklyJS.javascriptGenerator.valueToCode(
+      block,
+      "OBJECT",
+      BlocklyJS.Order.NONE
+    ) || "{}";
+
+  const key =
+    BlocklyJS.javascriptGenerator.valueToCode(
+      block,
+      "KEY",
+      BlocklyJS.Order.NONE
+    ) || '""';
+
+  const value =
+    BlocklyJS.javascriptGenerator.valueToCode(
+      block,
+      "VALUE",
+      BlocklyJS.Order.NONE
+    ) || "null";
+
+  const code = `(() => { const _ = ${obj}; _[${key}] = ${value}; return _; })()`;
+  return [code, BlocklyJS.Order.NONE];
+};
+
+Blockly.Blocks["json_delete_return"] = {
+  init: function () {
+    this.appendValueInput("OBJECT").setCheck("Object").appendField("in object");
+    this.appendValueInput("KEY").setCheck("String").appendField("remove");
+    this.setInputsInline(true);
+    this.setOutput(true, "Object");
+    this.setStyle("json_category");
+    this.setTooltip("Deletes a key from an object and returns the object.");
+  },
+};
+
+BlocklyJS.javascriptGenerator.forBlock["json_delete_return"] = function (block) {
+  const obj =
+    BlocklyJS.javascriptGenerator.valueToCode(
+      block,
+      "OBJECT",
+      BlocklyJS.Order.NONE
+    ) || "{}";
+
+  const key =
+    BlocklyJS.javascriptGenerator.valueToCode(
+      block,
+      "KEY",
+      BlocklyJS.Order.NONE
+    ) || '""';
+
+  const code = `(() => { const _ = ${obj}; delete _[${key}]; return _; })()`;
+  return [code, BlocklyJS.Order.NONE];
 };
 
 Blockly.Blocks["json_create_item"] = {
@@ -140,7 +251,7 @@ Blockly.Blocks["json_create"] = {
     this.itemCount_ = 0;
     this.updateShape_();
     this.setMutator(new Blockly.icons.MutatorIcon(["json_create_item"], this));
-    this.setTooltip("Create a JSON object with any number of keys.");
+    this.setTooltip("Create an object with any number of keys.");
     this.setInputsInline(false);
   },
   mutationToDom: function () {
@@ -283,7 +394,7 @@ Blockly.Blocks["json_create_statement"] = {
     this.appendStatementInput("STACK").setCheck("json_key_value");
     this.setOutput(true, "Object");
     this.setStyle("json_category");
-    this.setTooltip("Create a JSON object using stacked key/value pairs.");
+    this.setTooltip("Create an object using stacked key/value pairs.");
   },
 };
 
@@ -305,7 +416,7 @@ Blockly.Blocks["json_key_value_statement"] = {
     this.setNextStatement(true, "json_key_value");
     this.setInputsInline(true);
     this.setStyle("json_category");
-    this.setTooltip("A single key/value pair for a JSON object.");
+    this.setTooltip("A single key/value pair for an object.");
   },
 };
 
@@ -374,7 +485,7 @@ Blockly.Blocks["json_property_list"] = {
       .appendField("of");
     this.setOutput(true, "Array");
     this.setStyle("json_category");
-    this.setTooltip("Gets keys, values, or entries of the JSON object.");
+    this.setTooltip("Returns the keys, values, or entries of the object.");
   },
 };
 
@@ -412,6 +523,7 @@ Blockly.Blocks["json_parse"] = {
     const dropdown = new Blockly.FieldDropdown([
       ["object from text", "PARSE"],
       ["text from object", "STRINGIFY"],
+      ["pretty text from object", "PRETTY"],
     ]);
     dropdown.setValidator((newMode) => {
       this.updateType_(newMode);
@@ -483,11 +595,11 @@ BlocklyJS.javascriptGenerator.forBlock["json_parse"] = function (block) {
     ) || "null";
   const mode = block.getFieldValue("MODE");
 
-  if (mode === "PARSE") {
-    return [`JSON.parse(${input})`, BlocklyJS.Order.NONE];
-  } else if (mode === "STRINGIFY") {
-    return [`JSON.stringify(${input})`, BlocklyJS.Order.NONE];
-  }
+  let code = '';
+  if (mode === "PARSE") code = `JSON.parse(${input})`
+  else if (mode === "STRINGIFY") code = `JSON.stringify(${input})`
+  else if (mode === "PRETTY") code = `JSON.stringify(${input}, null, 2)`
+  return [code, BlocklyJS.Order.NONE];
 };
 
 Blockly.Blocks["json_clone"] = {
@@ -497,7 +609,7 @@ Blockly.Blocks["json_clone"] = {
       .appendField("clone object");
     this.setOutput(true, "Object");
     this.setStyle("json_category");
-    this.setTooltip("Creates a duplicate of a JSON object.");
+    this.setTooltip("Creates a duplicate of an object.");
   },
 };
 

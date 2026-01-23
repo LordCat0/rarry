@@ -64,7 +64,7 @@ div#stage {
 }
 
 header {
-  background-color: var(--header-color);
+  background: var(--header-color);
   display: flex;
   justify-content: space-between;
   align-items: center;

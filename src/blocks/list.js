@@ -1,10 +1,12 @@
 import * as Blockly from "blockly";
 import * as BlocklyJS from "blockly/javascript";
+import { DuplicateOnDragWithType } from "../functions/utils";
 
 Blockly.Blocks["lists_filter"] = {
   init: function () {
     this.appendValueInput("list").setCheck("Array").appendField("filter list");
-    this.appendValueInput("method").setCheck("Boolean").appendField("by");
+    this.appendValueInput("item").setCheck("DuplicateShadowType").appendField("by");
+    this.appendValueInput("method").setCheck("Boolean").appendField("⇒");
     this.setInputsInline(true);
     this.setOutput(true, "Array");
     this.setStyle("list_blocks");
@@ -18,22 +20,23 @@ BlocklyJS.javascriptGenerator.forBlock["lists_filter"] = function (
   block,
   generator
 ) {
-  var val_list = generator.valueToCode(block, "list", BlocklyJS.Order.ATOMIC);
-  var val_method = generator.valueToCode(
+  const list = generator.valueToCode(block, "list", BlocklyJS.Order.ATOMIC);
+  const method = generator.valueToCode(
     block,
     "method",
     BlocklyJS.Order.ATOMIC
   );
-  var code = `${val_list}.filter(findOrFilterItem => ${val_method})`;
+  const code = `${list}.filter(async (findOrFilterItem) => ${method})`;
   return [code, BlocklyJS.Order.NONE];
 };
 
 Blockly.Blocks["lists_find"] = {
   init: function () {
     this.appendValueInput("list").setCheck("Array").appendField("in list");
+    this.appendValueInput("item").setCheck("DuplicateShadowType").appendField("find first");
     this.appendValueInput("method")
       .setCheck("Boolean")
-      .appendField("find first that matches");
+      .appendField("that matches");
     this.setOutput(true, null);
     this.setInputsInline(true);
     this.setStyle("list_blocks");
@@ -47,22 +50,54 @@ BlocklyJS.javascriptGenerator.forBlock["lists_find"] = function (
   block,
   generator
 ) {
-  var val_list = generator.valueToCode(block, "list", BlocklyJS.Order.ATOMIC);
-  var val_method = generator.valueToCode(
+  const list = generator.valueToCode(block, "list", BlocklyJS.Order.ATOMIC);
+  const method = generator.valueToCode(
     block,
     "method",
     BlocklyJS.Order.ATOMIC
   );
-  var code = `${val_list}.find(findOrFilterItem => ${val_method})`;
+  const code = `${list}.find(findOrFilterItem => ${method})`;
+  return [code, BlocklyJS.Order.NONE];
+};
+
+Blockly.Blocks["lists_map"] = {
+  init: function () {
+    this.appendValueInput("list").setCheck("Array").appendField("map list");
+    this.appendValueInput("item").setCheck("DuplicateShadowType").appendField("by");
+    this.appendValueInput("method").setCheck(null).appendField("⇒");
+    this.setOutput(true, "Array");
+    this.setInputsInline(true);
+    this.setStyle("list_blocks");
+  },
+};
+
+BlocklyJS.javascriptGenerator.forBlock["lists_map"] = function (
+  block,
+  generator
+) {
+  const list = generator.valueToCode(block, "list", BlocklyJS.Order.ATOMIC);
+  const method = generator.valueToCode(block,"method",BlocklyJS.Order.ATOMIC);
+  const code = `${list}.map(findOrFilterItem => ${method})`;
   return [code, BlocklyJS.Order.NONE];
 };
 
 Blockly.Blocks["lists_filter_item"] = {
   init: function () {
-    this.appendDummyInput("name").appendField("item in loop");
+    this.appendDummyInput("name").appendField("item");
     this.setInputsInline(true);
-    this.setOutput(true, null);
+    this.setOutput(true, "DuplicateShadowType");
     this.setStyle("list_blocks");
+
+    const outputTypes = null;
+    this.setOutput(true, null);
+    setTimeout(() => {
+      if (this.setDragStrategy && this.isShadow()) {
+        this.setOutput(true, "DuplicateShadowType");
+        this.setDragStrategy(new DuplicateOnDragWithType(this, outputTypes));
+      } else {
+        this.setOutput(true, outputTypes);
+      }
+    });
   },
 };
 
@@ -97,16 +132,21 @@ BlocklyJS.javascriptGenerator.forBlock["lists_merge"] = function (
 
 Blockly.Blocks["lists_foreach"] = {
   init: function () {
+    this.appendValueInput("ITEM")
+      .setCheck("DuplicateShadowType")
+      .appendField("for each");
+      this.appendValueInput("INDEX")
+      .setCheck("DuplicateShadowType");
     this.appendValueInput("LIST")
       .setCheck("Array")
-      .appendField("for each item in list");
+      .appendField("in list");
     this.appendStatementInput("DO").appendField("do");
-    this.setInputsInline(false);
+    this.setInputsInline(true);
     this.setPreviousStatement(true, null);
     this.setNextStatement(true, null);
     this.setStyle("list_blocks");
     this.setTooltip(
-      "Loops through every item in a list and runs the code inside for each one"
+      "Loops through every item in a list and runs the code inside for each one."
     );
   },
 };
@@ -118,9 +158,33 @@ BlocklyJS.javascriptGenerator.forBlock["lists_foreach"] = function (
   const list =
     generator.valueToCode(block, "LIST", BlocklyJS.Order.NONE) || "[]";
   const branch = generator.statementToCode(block, "DO");
-  const code = `${list}.forEach(findOrFilterItem => {\n${branch}});\n`;
+  const code = `${list}.forEach(async (findOrFilterItem, indexForEach) => {\n${branch}});\n`;
   return code;
 };
+
+Blockly.Blocks["lists_foreach_index"] = {
+  init: function () {
+    this.appendDummyInput("name").appendField("index");
+    this.setInputsInline(true);
+    this.setStyle("list_blocks");
+
+    const outputTypes = "Number";
+    this.setOutput(true, null);
+    setTimeout(() => {
+      if (this.setDragStrategy && this.isShadow()) {
+        this.setOutput(true, "DuplicateShadowType");
+        this.setDragStrategy(new DuplicateOnDragWithType(this, outputTypes));
+      } else {
+        this.setOutput(true, outputTypes);
+      }
+    });
+  },
+};
+
+BlocklyJS.javascriptGenerator.forBlock["lists_foreach_index"] = () => [
+  "indexForEach",
+  BlocklyJS.Order.NONE,
+];
 
 Blockly.Blocks["lists_getIndex_modified"] = {
   init: function () {
@@ -397,7 +461,7 @@ Blockly.Blocks["lists_setIndex_modified"] = {
     try {
       this.moveInputBefore("AT", "TO");
       if (this.getInput("ORDINAL")) this.moveInputBefore("ORDINAL", "TO");
-    } catch (e) {}
+    } catch (e) { }
   },
 };
 
@@ -443,11 +507,10 @@ BlocklyJS.javascriptGenerator.forBlock["lists_setIndex_modified"] = function (
   if (i < 0) i += _.length;
   if (i < 0) i = 0;
   if (i > _.length) i = _.length;
-  return ${
-    mode === "INSERT"
+  return ${mode === "INSERT"
       ? `_.toSpliced(i, 0, ${valueCode})`
       : `i < _.length ? _.toSpliced(i, 1, ${valueCode}) : _`
-  };
+    };
 })(${listCode})`;
 
   return [code, BlocklyJS.Order.FUNCTION_CALL];
