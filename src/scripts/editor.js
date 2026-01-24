@@ -2080,3 +2080,31 @@ workspace.addChangeListener((event) => {
 workspace.updateAllFunctionCalls = () => {
   updateAllFunctionCalls(workspace);
 };
+
+// tools for dev :3
+if (window.location.hostname === "localhost") {
+  const stageControls = document.getElementById("stage-controls");
+
+  const devButton = document.createElement('button');
+  devButton.innerHTML = '<img src="icons/dev-tools-icon.png">';
+  devButton.addEventListener('click', (e) => {
+    showPopup({
+      title: "Dev Tools",
+      rows: [
+        [
+          {
+          type: "button",
+          label: 'Console log workspace XML',
+          onClick: (popup) => {
+            console.log(Blockly.Xml.workspaceToDom(workspace));
+
+            popup.remove();
+          }
+        },
+        ]
+      ]
+    })
+  });
+
+  stageControls.appendChild(devButton);
+}

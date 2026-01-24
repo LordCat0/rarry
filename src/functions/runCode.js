@@ -440,7 +440,7 @@ export function runCodeWithFunctions({
     if (spriteData.currentBubble) spriteData.currentBubble.visible = bool;
   }
 
-  console.log(code)
+  console.info('Generated code:\n' + code);
 
   eval(code);
 }

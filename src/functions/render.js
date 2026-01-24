@@ -65,8 +65,7 @@ class CustomConstantProvider extends Blockly.zelos.ConstantProvider {
     const maxHeight = maxWidth * 2;
 
     function makeMainPath(blockHeight, up, right) {
-      const remainingHeight =
-        blockHeight > maxHeight ? blockHeight - maxHeight : 0;
+      const extra = blockHeight > maxHeight ? blockHeight - maxHeight : 0;
       const height = blockHeight > maxHeight ? maxHeight : blockHeight;
       const radius = height / 8;
 
@@ -81,7 +80,7 @@ class CustomConstantProvider extends Blockly.zelos.ConstantProvider {
         q ${radiusW} 0 ${radiusW} ${radiusH}
         q 0 ${radiusH} ${radiusW} ${radiusH}
         q ${radiusW} 0 ${radiusW} ${radiusH}
-        v ${(remainingHeight + height - radius * 6) * dirUp}
+        v ${(extra + height - radius * 6) * dirUp}
         q 0 ${radiusH} ${-radiusW} ${radiusH}
         q ${-radiusW} 0 ${-radiusW} ${radiusH}
         q 0 ${radiusH} ${-radiusW} ${radiusH}
@@ -90,7 +89,7 @@ class CustomConstantProvider extends Blockly.zelos.ConstantProvider {
     }
 
     return {
-      type: this.SHAPES.HEXAGONAL,
+      type: this.SHAPES.ROUND,
       isDynamic: true,
       width(height) {
         const halfHeight = height / 2;
